@@ -34,17 +34,6 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-/*
-~/lightsrv.git/build$ ./lightsrv 0.0.0.0 8888 1 ../key.pem ../cert.pem
-*/
-
-/*
-luser@d10-dev:~$ curl -k --http2 "https://d10-dev.lan:8888/v1/switch/0"; echo
-{"response": {"on": false}, "error": {"code": 0}}
-luser@d10-dev:~$ curl -k --http2 -X PUT -H "Content-Type: application/json" -d '{"on":true}' "https://d10-dev.lan:8888/v1/switch/0"; echo
-{"response": {"on": true}, "error": {"code": 0}, "request": {"on": true}}
-*/
-
 #include <iostream>
 #include <string>
 #include <vector>
@@ -55,6 +44,8 @@ luser@d10-dev:~$ curl -k --http2 -X PUT -H "Content-Type: application/json" -d '
 
 #include "json11.git/json11.hpp"
 
+#include "BCM2835.h"
+
 using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
@@ -62,18 +53,23 @@ class Mockup {
   std::vector<bool> lights;
 public:
   Mockup(int size): lights(size, false) {}
-  bool do_switch(int channel, bool value) {
+  bool switch_channel(int channel, bool value) {
     lights[channel]=value;
     return value;
   }
-  bool get_switch(int channel) {
+  bool get_channel(int channel) {
     return lights[channel];
   }
 };
 
 int main(int argc, char *argv[]) {
   try {
+    #if 0
     Mockup backend(2);
+    #else
+    BCM2835 backend { 17, 27 };
+    backend.setup();
+    #endif
     // Check command line arguments.
     if (argc < 4) {
       std::cerr
@@ -124,7 +120,7 @@ int main(int argc, char *argv[]) {
           json11::Json body = json11::Json::parse(raw_body, err);
           if(err.empty()) {
             bool value = body["on"].bool_value();
-            backend.do_switch(channel, value);
+            backend.switch_channel(channel, value);
             res.write_head(200, {{"content-type", {"application/json", false}}});
             json11::Json r = json11::Json::object {
               {
@@ -135,7 +131,7 @@ int main(int argc, char *argv[]) {
               { "request", json11::Json::object { { "on", value } } },
               {
                 "response", json11::Json::object {
-                  { "on", backend.get_switch(channel) }
+                  { "on", backend.get_channel(channel) }
                 }
               }
             };
@@ -171,7 +167,7 @@ int main(int argc, char *argv[]) {
           },
           {
             "response", json11::Json::object {
-              { "on", backend.get_switch(channel) }
+              { "on", backend.get_channel(channel) }
             }
           }
         };
@@ -179,7 +175,37 @@ int main(int argc, char *argv[]) {
         res.end(r.dump());
       }
       else {
-        std::cerr << "DEBUG: unsupported request method: " << req.method() << ", returning 400 Bad request" << std::endl;
+        std::cerr << "DEBUG: unsupported request method for switch: " << req.method() << ", returning 400 Bad request" << std::endl;
+        res.write_head(400);
+        res.end("Bad request\n");
+      }
+    });
+
+    server.handle("/v1/list", [&backend](const request &req, const response &res) {
+      std::cerr << "DEBUG: in /v1/list handler" << std::endl;
+
+      if(req.method() == "GET") {
+        std::cerr << "DEBUG: received GET request." << std::endl;
+        res.write_head(200, {{"content-type", {"application/json", false}}});
+        json11::Json::array channels;
+        for(unsigned i=0; i<backend.size(); i++) channels.push_back(backend.get_channel(i));
+        json11::Json r = json11::Json::object {
+          {
+            "error", json11::Json::object {
+              { "code", 0 }
+            }
+          },
+          {
+            "response", json11::Json::object {
+              { "channels",  channels }
+            }
+          }
+        };
+        std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
+        res.end(r.dump());
+      }
+      else {
+        std::cerr << "DEBUG: unsupported request method for list: " << req.method() << ", returning 400 Bad request" << std::endl;
         res.write_head(400);
         res.end("Bad request\n");
       }

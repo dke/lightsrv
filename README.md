@@ -2,6 +2,12 @@
 
 Server copied from `nghttp2.git/examples/asio-sv.cc`
 
+## Dependencies
+
+* Boost
+* nghttp2 with asio bindings (you'll probably need to build that yourself, or are there packages providing this?)
+* C library for Broadcom BCM 2835 as used in Raspberry Pi : https://www.airspayce.com/mikem/bcm2835/
+
 ## Build it
 
 After checkout:
@@ -27,6 +33,8 @@ openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -node
 # in build/ dir
 ./lightsrv 0.0.0.0 8888 1 ../key.pem ../cert.pem
 ```
+
+If you use the "real" bcm backend (not the mockup one), that'll probably need root privileges, unless you find out how to do it without (and if so, then please tell me).
 
 ### Test it
 
