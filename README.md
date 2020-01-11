@@ -48,3 +48,11 @@ $ curl -k --http2 "https://d10-dev.lan:8888/v1/switch/0"; echo
 $ curl -k --http2 -X PUT -H "Content-Type: application/json" -d '{"on":false}' "https://d10-dev.lan:8888/v1/switch/0"; echo
 {"error": {"code": 0}, "request": {"on": false}, "response": {"on": false}}
 ```
+
+### HTML/Javascript client
+
+See `lightui.html`.
+
+Change the `$url` to point to the actual service url.
+
+In order to work, you need to make the browser accept the self-signed cert. Easiest to do so is to access some sever URL in the browser directly and follow the browsers questions.
