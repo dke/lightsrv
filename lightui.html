@@ -8,7 +8,7 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 
-    <title>Hello, world!</title>
+    <title>LightSrv HTML/JS Client</title>
   </head>
   <body>
     <h1>LightSrv HTML/JS Client</h1>
@@ -29,12 +29,17 @@
                 <input type="checkbox" class="custom-control-input" id="customSwitch2">
                 <label class="custom-control-label" for="customSwitch2">Switch 2</label>
             </div>
+            <div>
+                <label for="customRange1">Example range</label>
+                <input type="range" class="custom-range" id="customRange1">
+            <div>
         </form>
         <p class="mt-4"><strong>Note:</strong> Click on the toggle switch to see how it works.</p>
     </div>
 
     <script>
-      $url="https://pingu.lan/v1";
+      $url="https://d10-dev.lan:8888/v1";
+
       document.querySelectorAll('#customSwitch1, #customSwitch2').forEach((element) => {
         element.addEventListener('click', (e) => {
           $c = new XMLHttpRequest();
@@ -54,19 +59,42 @@
           $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
         });
       });
+
+      document.querySelectorAll('#customRange1').forEach((element) => {
+        element.addEventListener('input', (e) => {
+          $c = new XMLHttpRequest();
+          $c.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+              var rt = JSON.parse(this.responseText);
+              if (rt.error.code == 0) {
+                e.target.checked = rt.response.on == 1;
+              }
+              else {
+                alert("error in response");
+              }
+            }
+          };
+          $c.open("PUT", $url+'/pwm/'+(element.id == 'customRange1' ? 0 : 1), true);
+          $c.setRequestHeader('Content-type', 'application/json');
+          $c.send('{"value":'+e.target.value+'}');
+        });
+      });
+
       $c = new XMLHttpRequest();
       $c.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
           var rt = JSON.parse(this.responseText);
           if (rt.error.code == 0) {
-            document.getElementById('customSwitch1').checked = rt.response.channels[0] == 1;
-            document.getElementById('customSwitch2').checked = rt.response.channels[1] == 1;
+            document.getElementById('customSwitch1').checked = rt.response.switches[0] == 1;
+            document.getElementById('customSwitch2').checked = rt.response.switches[1] == 1;
+            document.getElementById('customRange1').value = rt.response.pwms[0];
           }
           else {
             alert("error in response");
           }
         }
       };
+
       $c.open("GET", $url+'/list', true);
       $c.setRequestHeader('Content-type', 'application/json');
       $c.send();

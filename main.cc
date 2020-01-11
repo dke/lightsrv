@@ -53,8 +53,9 @@ using namespace nghttp2::asio_http2::server;
 
 class Mockup {
   std::vector<bool> lights;
+  std::vector<unsigned> pwm;
 public:
-  Mockup(int size): lights(size, false) {}
+  Mockup(int size, int pwm_size): lights(size, false), pwm(pwm_size, 50) {}
   bool switch_channel(int channel, bool value) {
     lights[channel]=value;
     return value;
@@ -63,6 +64,9 @@ public:
     return lights[channel];
   }
   unsigned size() const { return lights.size(); }
+  unsigned get_pwm(int channel) const { return pwm[channel]; }
+  unsigned set_pwm(int channel, unsigned p) { pwm[channel]=p; return p; }
+  unsigned pwm_size() const { return pwm.size(); }
 };
 
 int main(int argc, char *argv[]) {
@@ -71,7 +75,7 @@ int main(int argc, char *argv[]) {
     BCM2835 backend { 17, 27 };
     backend.setup();
     #else
-    Mockup backend(2);
+    Mockup backend(2, 1);
     #endif
     // Check command line arguments.
     if (argc < 4) {
@@ -200,6 +204,106 @@ int main(int argc, char *argv[]) {
       }
     });
 
+    server.handle("/v1/pwm/", [&backend](const request &req, const response &res) {
+      std::cerr << "DEBUG: in /v1/pwm/ handler" << std::endl;
+
+      std::string path=req.uri().path;
+      std::vector<std::string> paths;
+      boost::split(paths, path, boost::is_any_of("/"));
+      int channel=std::stoi(paths.back());
+
+      if(req.method() == "PUT") {
+        std::ostringstream *ostr=new std::ostringstream();
+        req.on_data([&res, ostr, channel, &backend](const uint8_t *data, std::size_t len) {
+          if(len>0) {
+            ostr->write((const char *)data, len);
+            return;
+          }
+          std::cerr << "DEBUG: received PUT request: " << ostr->str() << std::endl;
+
+          // convert to json
+          std::string err;
+          std::string raw_body = ostr->str();
+          delete ostr;
+
+          json11::Json body = json11::Json::parse(raw_body, err);
+          if(err.empty()) {
+            int value = body["value"].int_value();
+            backend.set_pwm(channel, value);
+            res.write_head(200, {
+              {"content-type", {"application/json", false}},
+              {"Access-Control-Allow-Origin", {"*", false}}
+            });
+            json11::Json r = json11::Json::object {
+              {
+                "error", json11::Json::object {
+                  { "code", 0 }
+                }
+              },
+              { "request", json11::Json::object { { "value", value } } },
+              {
+                "response", json11::Json::object {
+                  { "value", (int)backend.get_pwm(channel) }
+                }
+              }
+            };
+            std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
+            res.end(r.dump());
+          }
+          else {
+            std::cerr << "DEBUG: parse error on parsing json body: " << raw_body << std::endl;
+            std::cerr << "DEBUG: partial json result: " << body.dump() << std::endl;
+            std::cerr << "DEBUG: json parse error string: " << err << std::endl;
+            json11::Json r = json11::Json::object {
+              {
+                "error", json11::Json::object {
+                  { "code", 1 },
+                  { "category", "json parse error" },
+                  { "message", err }
+                }
+              }
+            };
+            std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
+            res.end(r.dump());
+          }
+        });
+      }
+      else if(req.method() == "GET") {
+        std::cerr << "DEBUG: received GET request." << std::endl;
+        res.write_head(200, {{"content-type", {"application/json", false}}});
+        json11::Json r = json11::Json::object {
+          {
+            "error", json11::Json::object {
+              { "code", 0 }
+            }
+          },
+          {
+            "response", json11::Json::object {
+              { "value", (int)backend.get_pwm(channel) }
+            }
+          }
+        };
+        std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
+        res.end(r.dump());
+      }
+      else if(req.method() == "OPTIONS") {
+        std::cerr << "DEBUG: received OPTIONS request." << std::endl;
+        res.write_head(204, {
+          {"content-length", {"0", false}},
+          {"allow", {"OPTIONS,GET,PUT", false}},
+          {"Access-Control-Allow-Origin", {"*", false}},
+          {"Access-Control-Allow-Methods", {"GET,PUT,OPTIONS", false}},
+          {"Access-Control-Allow-Headers", {"*", false}}
+        });
+        res.end();
+      }      
+      else {
+        std::cerr << "DEBUG: unsupported request method for switch: " << req.method() << ", returning 400 Bad request" << std::endl;
+        res.write_head(400);
+        res.end("Bad request\n");
+      }
+    });
+
     server.handle("/v1/list", [&backend](const request &req, const response &res) {
       std::cerr << "DEBUG: in /v1/list handler" << std::endl;
 
@@ -209,8 +313,10 @@ int main(int argc, char *argv[]) {
           {"content-type", {"application/json", false}},
           {"Access-Control-Allow-Origin", {"*", false}}
         });
-        json11::Json::array channels;
-        for(unsigned i=0; i<backend.size(); i++) channels.push_back(backend.get_channel(i));
+        json11::Json::array switches;
+        for(unsigned i=0; i<backend.size(); i++) switches.push_back(backend.get_channel(i));
+        json11::Json::array pwms;
+        for(unsigned i=0; i<backend.pwm_size(); i++) pwms.push_back((int)backend.get_pwm(i));
         json11::Json r = json11::Json::object {
           {
             "error", json11::Json::object {
@@ -219,7 +325,8 @@ int main(int argc, char *argv[]) {
           },
           {
             "response", json11::Json::object {
-              { "channels",  channels }
+              { "switches", switches },
+              { "pwms", pwms },
             }
           }
         };
