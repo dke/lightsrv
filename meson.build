@@ -20,7 +20,7 @@ configure_file(input : 'config.h.in', output : 'config.h', configuration : conf_
 sources = ['main.cc', 'json11.git/json11.cpp']
 
 if lib_bcm2835.found()
-    sources.append('BCM2835.cc')
+    sources += ['BCM2835.cc']
 endif
 
 exe = executable('lightsrv', sources,

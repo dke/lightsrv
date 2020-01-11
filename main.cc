@@ -37,6 +37,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "config.h"
 
 #include <boost/algorithm/string.hpp>
 
@@ -44,13 +45,9 @@
 
 #include "json11.git/json11.hpp"
 
-#ifdef BCM2385_FOUND
+#ifdef bcm2385_found
 #include "BCM2835.h"
-#endif
-
-using namespace nghttp2::asio_http2;
-using namespace nghttp2::asio_http2::server;
-
+#else
 class Mockup {
   std::vector<bool> lights;
   std::vector<unsigned> pwm;
@@ -68,11 +65,15 @@ public:
   unsigned set_pwm(int channel, unsigned p) { pwm[channel]=p; return p; }
   unsigned pwm_size() const { return pwm.size(); }
 };
+#endif
+
+using namespace nghttp2::asio_http2;
+using namespace nghttp2::asio_http2::server;
 
 int main(int argc, char *argv[]) {
   try {
-    #if BCM2385_FOUND
-    BCM2835 backend { 17, 27 };
+    #ifdef bcm2385_found
+    BCM2835 backend { { 17, 27 }, { 18 } };
     backend.setup();
     #else
     Mockup backend(2, 1);
@@ -298,7 +299,7 @@ int main(int argc, char *argv[]) {
         res.end();
       }      
       else {
-        std::cerr << "DEBUG: unsupported request method for switch: " << req.method() << ", returning 400 Bad request" << std::endl;
+        std::cerr << "DEBUG: unsupported request method for pwm: " << req.method() << ", returning 400 Bad request" << std::endl;
         res.write_head(400);
         res.end("Bad request\n");
       }

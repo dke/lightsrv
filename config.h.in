@@ -1,6 +1,6 @@
 #ifndef LIGHTSRV_CONFIG_H
 #define LIGHTSRV_CONFIG_H
 
-#mesondefine BCM2385_FOUND
+#mesondefine bcm2385_found
 
 #endif
