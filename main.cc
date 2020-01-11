@@ -88,12 +88,14 @@ int main(int argc, char *argv[]) {
 
     server.num_threads(num_threads);
 
+    #if 0
     server.handle("/", [](const request &req, const response &res) {
       (void)req;
       std::cerr << "DEBUG: in / handler" << std::endl;
       res.write_head(200, {{"foo", {"bar", false}}});
       res.end("hello, world\n");
     });
+    #endif
 
     server.handle("/v1/switch/", [&backend](const request &req, const response &res) {
       std::cerr << "DEBUG: in /v1/switch/ handler" << std::endl;
@@ -121,7 +123,10 @@ int main(int argc, char *argv[]) {
           if(err.empty()) {
             bool value = body["on"].bool_value();
             backend.switch_channel(channel, value);
-            res.write_head(200, {{"content-type", {"application/json", false}}});
+            res.write_head(200, {
+              {"content-type", {"application/json", false}},
+              {"Access-Control-Allow-Origin", {"*", false}}
+            });
             json11::Json r = json11::Json::object {
               {
                 "error", json11::Json::object {
@@ -174,6 +179,17 @@ int main(int argc, char *argv[]) {
         std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
         res.end(r.dump());
       }
+      else if(req.method() == "OPTIONS") {
+        std::cerr << "DEBUG: received OPTIONS request." << std::endl;
+        res.write_head(204, {
+          {"content-length", {"0", false}},
+          {"allow", {"OPTIONS,GET,PUT", false}},
+          {"Access-Control-Allow-Origin", {"*", false}},
+          {"Access-Control-Allow-Methods", {"GET,PUT,OPTIONS", false}},
+          {"Access-Control-Allow-Headers", {"*", false}}
+        });
+        res.end();
+      }      
       else {
         std::cerr << "DEBUG: unsupported request method for switch: " << req.method() << ", returning 400 Bad request" << std::endl;
         res.write_head(400);
@@ -186,7 +202,10 @@ int main(int argc, char *argv[]) {
 
       if(req.method() == "GET") {
         std::cerr << "DEBUG: received GET request." << std::endl;
-        res.write_head(200, {{"content-type", {"application/json", false}}});
+        res.write_head(200, {
+          {"content-type", {"application/json", false}},
+          {"Access-Control-Allow-Origin", {"*", false}}
+        });
         json11::Json::array channels;
         for(unsigned i=0; i<backend.size(); i++) channels.push_back(backend.get_channel(i));
         json11::Json r = json11::Json::object {
@@ -204,8 +223,41 @@ int main(int argc, char *argv[]) {
         std::cerr << "DEBUG: returning response: " << r.dump() << std::endl;
         res.end(r.dump());
       }
+      else if(req.method() == "OPTIONS") {
+        std::cerr << "DEBUG: received OPTIONS request." << std::endl;
+        res.write_head(204, {
+          {"content-length", {"0", false}},
+          {"allow", {"OPTIONS,GET,PUT", false}},
+          {"Access-Control-Allow-Origin", {"*", false}},
+          {"Access-Control-Allow-Methods", {"GET,OPTIONS", false}},
+          {"Access-Control-Allow-Headers", {"*", false}}
+        });
+        res.end();
+      }
       else {
         std::cerr << "DEBUG: unsupported request method for list: " << req.method() << ", returning 400 Bad request" << std::endl;
+        res.write_head(400);
+        res.end("Bad request\n");
+      }
+
+    });
+
+    server.handle("/", [&backend](const request &req, const response &res) {
+      std::cerr << "DEBUG: in / handler" << std::endl;
+
+      if(req.method() == "OPTIONS") {
+        std::cerr << "DEBUG: received OPTIONS request." << std::endl;
+        res.write_head(204, {
+          {"content-length", {"0", false}},
+          {"allow", {"OPTIONS,GET,PUT", false}},
+          {"Access-Control-Allow-Origin", {"*", false}},
+          {"Access-Control-Allow-Methods", {"GET,PUT,OPTIONS", false}},
+          {"Access-Control-Allow-Headers", {"*", false}}
+        });
+        res.end();
+      }
+      else {
+        std::cerr << "DEBUG: unsupported request method for /: " << req.method() << ", returning 400 Bad request" << std::endl;
         res.write_head(400);
         res.end("Bad request\n");
       }
