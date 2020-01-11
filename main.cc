@@ -44,7 +44,9 @@
 
 #include "json11.git/json11.hpp"
 
+#ifdef BCM2385_FOUND
 #include "BCM2835.h"
+#endif
 
 using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
@@ -60,15 +62,16 @@ public:
   bool get_channel(int channel) {
     return lights[channel];
   }
+  unsigned size() const { return lights.size(); }
 };
 
 int main(int argc, char *argv[]) {
   try {
-    #if 0
-    Mockup backend(2);
-    #else
+    #if BCM2385_FOUND
     BCM2835 backend { 17, 27 };
     backend.setup();
+    #else
+    Mockup backend(2);
     #endif
     // Check command line arguments.
     if (argc < 4) {
