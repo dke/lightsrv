@@ -34,6 +34,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
+//#include <syslog.h>
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -71,9 +73,18 @@ using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
 int main(int argc, char *argv[]) {
+  //setlogmask (LOG_UPTO (LOG_INFO));
+  //setlogmask (LOG_UPTO (LOG_DEBUG));
+  //openlog ("pwm", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
   try {
     #ifdef bcm2385_found
+    #if 0 // pingu
     BCM2835 backend { { 17, 27 }, { 18 } };
+    backend.set_inverted(true);
+    #else // luci
+    BCM2835 backend { { 24, 23, 22, 17 }, { 18 } };
+    backend.set_inverted(false);
+    #endif
     backend.setup();
     #else
     Mockup backend(2, 1);
@@ -461,5 +472,6 @@ int main(int argc, char *argv[]) {
     std::cerr << "exception: " << e.what() << "\n";
   }
 
+  //closelog();
   return 0;
 }
