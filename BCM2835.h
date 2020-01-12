@@ -27,8 +27,8 @@ public:
     int switch_channel(unsigned channel, int value);
     int get_channel(unsigned channel);
     unsigned size() const;
-    unsigned get_pwm(int channel);
-    unsigned set_pwm(int channel, unsigned p);
+    unsigned get_pwm(unsigned channel);
+    unsigned set_pwm(unsigned channel, unsigned p);
     unsigned pwm_size() const;
 };
 

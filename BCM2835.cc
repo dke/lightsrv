@@ -29,14 +29,14 @@ void BCM2835::close() {
     bcm2835_close();
 }
 
-BCM2835::BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p): debug(false), inverted(false), channels(c), pwms(p), pwm_values(p.size(), 512) {}
+BCM2835::BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p): debug(false), inverted(false), channels(c), pwms(p), pwm_values(p.size(), 50) {}
 
 void BCM2835::set_debug(bool d) { debug=d; }
 void BCM2835::set_inverted(bool d) { inverted=d; }
 
 // todo: support multiple PWMs is halfway included down there
-#define PWM_PIN RPI_GPIO_P1_12
-#define PWM_CHANNEL 0
+//#define PWM_PIN RPI_GPIO_P1_12
+//#define PWM_CHANNEL 0
 
 void BCM2835::setup() {
     init();
@@ -47,14 +47,15 @@ void BCM2835::setup() {
         bcm2835_gpio_fsel(channels[channel], BCM2835_GPIO_FSEL_OUTP);
     }
 
-    for(auto pwm: pwms) {
+    //for(auto pwm: pwms) {
+    for(unsigned pwm_channel=0; pwm_channel<pwms.size(); pwm_channel++) {
         // Set the pwm pin to Alt Fun 5, to allow PWM channel 0 to be output there
-        bcm2835_gpio_fsel(PWM_PIN, BCM2835_GPIO_FSEL_ALT5);
+        bcm2835_gpio_fsel(pwms[pwm_channel], BCM2835_GPIO_FSEL_ALT5);
         bcm2835_pwm_set_clock(BCM2835_PWM_CLOCK_DIVIDER_16);
-        bcm2835_pwm_set_mode(PWM_CHANNEL, 1, 1);
-        bcm2835_pwm_set_range(PWM_CHANNEL, 1024);
+        bcm2835_pwm_set_mode(pwm_channel, 1, 1);
+        bcm2835_pwm_set_range(pwm_channel, 1024);
         // init to pwm 50%
-        bcm2835_pwm_set_data(PWM_CHANNEL, 512);
+        bcm2835_pwm_set_data(pwm_channel, 512);
     }
 
     close();
@@ -84,14 +85,18 @@ unsigned BCM2835::size() const {
     return channels.size();
 }
 
-unsigned BCM2835::get_pwm(int channel) {
+unsigned BCM2835::get_pwm(unsigned channel) {
     return pwm_values[channel];
 }
 
-unsigned BCM2835::set_pwm(int channel, unsigned p) {
+unsigned BCM2835::set_pwm(unsigned channel, unsigned p) {
     init();
-    //syslog(LOG_DEBUG, "bcm2835_pwm_set_data(%d, %d)", PWM_CHANNEL, pwm_trsf(p));
-    bcm2835_pwm_set_data(PWM_CHANNEL, pwm_trsf(p));
+    // TODO more rigid error handling
+    if(channel>pwms.size()) {
+        return 0;
+    }
+    //syslog(LOG_DEBUG, "bcm2835_pwm_set_data(%d, %d)", channel, pwm_trsf(p));
+    bcm2835_pwm_set_data(channel, pwm_trsf(p));
     pwm_values[channel]=p;
     close();
     return p;

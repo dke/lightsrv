@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
   try {
     #ifdef bcm2385_found
     #if 0 // pingu
+    // 18: RPI_GPIO_P1_12
     BCM2835 backend { { 17, 27 }, { 18 } };
     backend.set_inverted(true);
     #else // luci
