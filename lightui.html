@@ -19,75 +19,101 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 
-    <div class="bs-example">
-        <form>
-            <div class="custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="customSwitch1">
-                <label class="custom-control-label" for="customSwitch1">Switch 1</label>
-            </div>
-            <div class="custom-control custom-switch mt-2">
-                <input type="checkbox" class="custom-control-input" id="customSwitch2">
-                <label class="custom-control-label" for="customSwitch2">Switch 2</label>
-            </div>
-            <div>
-                <label for="customRange1">Example range</label>
-                <input type="range" class="custom-range" id="customRange1">
-            <div>
-        </form>
-        <p class="mt-4"><strong>Note:</strong> Click on the toggle switch to see how it works.</p>
+    <div class="bs-example" id="container">
     </div>
 
     <script>
-      $url="https://d10-dev.lan:8888/v1";
-
-      document.querySelectorAll('#customSwitch1, #customSwitch2').forEach((element) => {
-        element.addEventListener('click', (e) => {
-          $c = new XMLHttpRequest();
-          $c.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              var rt = JSON.parse(this.responseText);
-              if (rt.error.code == 0) {
-                e.target.checked = rt.response.on == 1;
-              }
-              else {
-                alert("error in response");
-              }
-            }
-          };
-          $c.open("PUT", $url+'/switch/'+(element.id == 'customSwitch1' ? 0 : 1), true);
-          $c.setRequestHeader('Content-type', 'application/json');
-          $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
-        });
-      });
-
-      document.querySelectorAll('#customRange1').forEach((element) => {
-        element.addEventListener('input', (e) => {
-          $c = new XMLHttpRequest();
-          $c.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              var rt = JSON.parse(this.responseText);
-              if (rt.error.code == 0) {
-                e.target.checked = rt.response.on == 1;
-              }
-              else {
-                alert("error in response");
-              }
-            }
-          };
-          $c.open("PUT", $url+'/pwm/'+(element.id == 'customRange1' ? 0 : 1), true);
-          $c.setRequestHeader('Content-type', 'application/json');
-          $c.send('{"value":'+e.target.value+'}');
-        });
-      });
+      // $url="https://d10-dev.lan:8888/v1";
+      // $url="https://pingu.lan/v1";
+      $url="https://luci.lan/v1";
 
       $c = new XMLHttpRequest();
       $c.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
           var rt = JSON.parse(this.responseText);
           if (rt.error.code == 0) {
-            document.getElementById('customSwitch1').checked = rt.response.switches[0] == 1;
-            document.getElementById('customSwitch2').checked = rt.response.switches[1] == 1;
-            document.getElementById('customRange1').value = rt.response.pwms[0];
+            var container = document.getElementById("container");
+
+            //for(let s in rt.response.switches) {
+            for(var i=0; i<rt.response.switches.length; i++) {
+              var s = rt.response.switches[i];
+
+              var div = document.createElement("div");
+              div.className = (i==0?"custom-control custom-switch":"custom-control custom-switch mt-2");
+
+              var input = document.createElement("input");
+              input.type = "checkbox";
+              input.className = "custom-control-input";
+              input.id = "customSwitch" + i;
+              input.checked = s==1;
+              input.addEventListener('click', (e) => {
+                $c = new XMLHttpRequest();
+                $c.onreadystatechange = function() {
+                  if (this.readyState == 4 && this.status == 200) {
+                    var rt = JSON.parse(this.responseText);
+                    if (rt.error.code == 0) {
+                      e.target.checked = rt.response.on == 1;
+                    }
+                    else {
+                      alert("error in response");
+                    }
+                  }
+                };
+                $c.open("PUT", $url+'/switch/'+parseInt(e.target.id.substring(12),10), true);
+                $c.setRequestHeader('Content-type', 'application/json');
+                $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
+              });
+              div.appendChild(input);
+
+              var label = document.createElement("label");
+              label.className = "custom-control-label";
+              label.htmlFor = "customSwitch" + i;
+              label.innerHTML = "Switch " + i;
+              div.appendChild(label);
+
+              container.appendChild(div);
+            }
+
+            for(var i=0; i<rt.response.pwms.length; i++) {
+              var pwm = rt.response.pwms[i];
+
+              var div = document.createElement("div");
+              div.className = (i==0?"custom-control custom-switch":"custom-control custom-switch mt-2");
+
+              // <label for="customRange1">Example range</label>
+              var label = document.createElement("label");
+              label.htmlFor = "customRange" + i;
+              label.innerHTML = "PWM Value " + i;
+              div.appendChild(label);
+
+              // <input type="range" class="custom-range" id="customRange1">
+              var input = document.createElement("input");
+              input.type = "range";
+              input.className = "custom-range";
+              input.id = "customRange" + i;
+              input.value = pwm;
+              input.addEventListener('input', (e) => {
+                $c = new XMLHttpRequest();
+                $c.onreadystatechange = function() {
+                  if (this.readyState == 4 && this.status == 200) {
+                    var rt = JSON.parse(this.responseText);
+                    if (rt.error.code == 0) {
+                      //e.target.checked = rt.response.on == 1;
+                    }
+                    else {
+                      alert("error in response");
+                    }
+                  }
+                };
+                $c.open("PUT", $url+'/pwm/'+parseInt(e.target.id.substring(11),10), true);
+                $c.setRequestHeader('Content-type', 'application/json');
+                $c.send('{"value":'+e.target.value+'}');
+              });
+              div.appendChild(input);
+
+              container.appendChild(div);
+            }
+
           }
           else {
             alert("error in response");

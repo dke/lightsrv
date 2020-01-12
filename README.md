@@ -8,6 +8,26 @@ Server copied from `nghttp2.git/examples/asio-sv.cc`
 * nghttp2 with asio bindings (you'll probably need to build that yourself, or are there packages providing this?)
 * C library for Broadcom BCM 2835 as used in Raspberry Pi : https://www.airspayce.com/mikem/bcm2835/
 
+### BCM 2835
+
+After building and installing, create and install a `pkg-config` file manually. Assuming you installed to `/usr/local`, the file looks like:
+
+```
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libbcm2835
+Description: Raspberry Pi BCM2835 GPIO library
+URL: https://www.airspayce.com/mikem/bcm2835/
+Version: 1.36
+Libs: -L${libdir} -lbcm2835
+Cflags: -I${includedir}
+```
+
+Install that one to `${prefix}/lib/pkgconfig/libbcm2835.pc`.
+
 ## Build it
 
 After checkout:
