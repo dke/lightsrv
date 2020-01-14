@@ -25,7 +25,8 @@
     <script>
       // $url="https://d10-dev.lan:8888/v1";
       // $url="https://pingu.lan/v1";
-      $url="https://luci.lan/v1";
+      // $url="https://luci.lan/v1";
+      $url="https://de-x1.lan:8888/v1";
 
       $c = new XMLHttpRequest();
       $c.onreadystatechange = function() {
@@ -34,7 +35,49 @@
           if (rt.error.code == 0) {
             var container = document.getElementById("container");
 
-            //for(let s in rt.response.switches) {
+            if(rt.response.auto != undefined) { // TODO
+              var a = rt.response.auto;
+
+              var div = document.createElement("div");
+              div.className = "custom-control custom-switch";
+
+              var input = document.createElement("input");
+              input.type = "checkbox";
+              input.className = "custom-control-input";
+              input.id = "auto";
+              input.checked = a;
+              input.addEventListener('click', (e) => {
+                $c = new XMLHttpRequest();
+                $c.onreadystatechange = function() {
+                  if (this.readyState == 4 && this.status == 200) {
+                    var rt = JSON.parse(this.responseText);
+                    if (rt.error.code == 0) {
+                      e.target.checked = rt.response.value;
+                      document.querySelectorAll('.myclass').forEach((element) => {
+                        console.log("should disable: " + element.id);
+                        element.disabled = rt.response.value;
+                      });
+                    }
+                    else {
+                      alert("error in response");
+                    }
+                  }
+                };
+                $c.open("PUT", $url+'/auto', true);
+                $c.setRequestHeader('Content-type', 'application/json');
+                $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
+              });
+              div.appendChild(input);
+
+              var label = document.createElement("label");
+              label.className = "custom-control-label";
+              label.htmlFor = "auto";
+              label.innerHTML = "Automatic Mode";
+              div.appendChild(label);
+
+              container.appendChild(div);
+            }
+
             for(var i=0; i<rt.response.switches.length; i++) {
               var s = rt.response.switches[i];
 
@@ -43,9 +86,10 @@
 
               var input = document.createElement("input");
               input.type = "checkbox";
-              input.className = "custom-control-input";
+              input.className = "custom-control-input myclass";
               input.id = "customSwitch" + i;
               input.checked = s==1;
+              input.disabled = rt.response.auto;
               input.addEventListener('click', (e) => {
                 $c = new XMLHttpRequest();
                 $c.onreadystatechange = function() {
@@ -89,9 +133,10 @@
               // <input type="range" class="custom-range" id="customRange1">
               var input = document.createElement("input");
               input.type = "range";
-              input.className = "custom-range";
+              input.className = "custom-range myclass";
               input.id = "customRange" + i;
               input.value = pwm;
+              input.disabled = rt.response.auto;
               input.addEventListener('input', (e) => {
                 $c = new XMLHttpRequest();
                 $c.onreadystatechange = function() {

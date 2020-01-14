@@ -16,11 +16,7 @@ conf_data = configuration_data()
 conf_data.set('bcm2385_found', bcm2835_dep.found())
 configure_file(input : 'config.h.in', output : 'config.h', configuration : conf_data)
 
-sources = ['main.cc', 'json11.git/json11.cpp']
-
-if bcm2835_dep.found()
-    sources += ['BCM2835.cc']
-endif
+sources = ['main.cc', 'PeriodicTask.cc', 'BCM2835.cc', 'json11.git/json11.cpp']
 
 exe = executable('lightsrv', sources,
         dependencies : [thread_dep, boost_dep, nghttp2_dep, openssl_dep, bcm2835_dep])
