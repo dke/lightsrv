@@ -57,148 +57,6 @@
 
 #include "BCM2835.h"
 
-#if 0
-class Mockup {
-  std::vector<bool> lights;
-  std::vector<unsigned> pwm;
-public:
-  Mockup(int size, int pwm_size): lights(size, false), pwm(pwm_size, 50) {}
-  bool switch_channel(unsigned channel, bool value) {
-    if(channel<lights.size()) {
-      lights[channel]=value;
-      return value;
-    }
-    return false;
-  }
-  bool get_channel(unsigned channel) {
-    if(channel<lights.size()) {
-      return lights[channel];
-    }
-    return false;
-  }
-  unsigned size() const { return lights.size(); }
-  unsigned get_pwm(unsigned channel) const {
-    if(channel<pwm.size()) {
-      return pwm[channel];
-    }
-    return 0;
-  }
-  unsigned set_pwm(unsigned channel, unsigned p) {
-    if(channel<pwm.size()) {
-      pwm[channel]=p;
-      return p;
-    }
-    return 0;
-  }
-  unsigned pwm_size() const {
-    return pwm.size();
-  }
-
-  typedef unsigned dot;
-  typedef std::pair<dot, dot> interval;
-  bool autom() {
-    #if 1
-    time_t rawtime;
-    struct tm * timeinfo;
-    time ( &rawtime );
-    timeinfo = localtime ( &rawtime );
-    syslog(LOG_DEBUG, "reference: %s", asctime(timeinfo));
-    #endif
-
-    dot dotNow = dotFromNow();
-
-    syslog(LOG_DEBUG, "dotNow=%d==%s", dotNow, formatDot(dotNow).c_str());
-
-    std::vector<interval> on_times_light;
-    on_times_light.push_back(interval(dotFromString("12:00:00"), dotFromString("16:00:00")));
-    on_times_light.push_back(interval(dotFromString("18:00:00"), dotFromString("22:00:00")));
-
-    std::vector<interval> on_times_co2;
-    on_times_co2.push_back(interval(dotFromString("10:00:00"), dotFromString("14:00:00")));
-    on_times_co2.push_back(interval(dotFromString("16:00:00"), dotFromString("20:00:00")));
-
-    bool lightsOn=isOn(on_times_light, dotNow);
-    bool co2On=isOn(on_times_co2, dotNow);
-    double rel=envelope(dotNow)*noon(dotNow);
-    unsigned abs=rel*(768-100)+100;
-
-    syslog(LOG_INFO, "time %s: lightsOn: %d, co2On: %d, rel: %f, abs: %d", formatDot(dotNow).c_str(), lightsOn, co2On, rel, abs);
-    syslog(LOG_DEBUG, "rel: %f=%f*%f", rel, envelope(dotNow), noon(dotNow));
-
-    set_pwm(0, rel*100);
-    // lights
-    switch_channel(0, lightsOn);
-    switch_channel(1, lightsOn);
-    // filter/heating
-    switch_channel(2, true);
-    // co2
-    switch_channel(3, co2On);
-    return true;
-  }
-
-private:
-  double envelope(unsigned t) {
-    unsigned t0=t-dotFromString("12:00:00");
-    unsigned T=dotFromString("22:00:00")-dotFromString("12:00:00");
-    return std::sin(t0*M_PI/T);
-  }
-  double noon(unsigned t) {
-    if(t<dotFromString("15:30:00"))
-      return 1;
-    if(t<dotFromString("16:00:00")) {
-      // somehow ramp down to 0
-      unsigned t0=t-dotFromString("15:30:00");
-      return 1-double(t0)/dotFromString("00:30:00");
-    }
-    if(t<dotFromString("18:00:00")) {
-      return 0;
-    }
-    if(t<dotFromString("18:30:00")) {
-      // somehow ramp up to 1
-      unsigned t0=t-dotFromString("18:00:00");
-      return double(t0)/dotFromString("00:30:00");
-    }
-    return 1;
-  }
-  unsigned dotFromTm(const tm &t) const {
-    return 60*60*t.tm_hour + 60*t.tm_min + t.tm_sec;
-  }
-  unsigned dotFromNow() const {
-    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-    time_t tt = std::chrono::system_clock::to_time_t(now);
-    tm local_tm = *localtime(&tt);
-    return dotFromTm(local_tm);
-  }
-  unsigned dotFromString(const std::string &s) const {
-    std::vector<std::string> tokens;
-    boost::split(tokens, s, boost::is_any_of(":"));
-    dot t = std::stoi(tokens[0])*3600+std::stoi(tokens[1])*60+std::stoi(tokens[2]);
-    //syslog(LOG_DEBUG, "dotFromTm(t)=" << t << std::endl;
-    return t;
-  }
-  bool isInInterval(const interval &i, unsigned dot) {
-    //syslog(LOG_DEBUG, "interval: (" << formatDot(i.first) << ", " << formatDot(i.second) << ")" << std::endl;
-    bool on=(dot>=i.first && dot<i.second);
-    syslog(LOG_DEBUG, "%d isInInterval (%d, %d): %d", dot, i.first, i.second, on);
-    return on;
-  }
-  bool isOn(const std::vector<interval> &times, unsigned dot) {
-    for(auto &i: times) {
-      if(isInInterval(i, dot)) return true;
-    }
-    return false;
-  }
-  std::string formatDot(dot t) {
-    unsigned h=t/3600;
-    unsigned m=(t-h*3600)/60;
-    unsigned s=t%60;
-    std::ostringstream o;
-    o << boost::format ("%02d:%02d:%02d") % h % m % s;
-    return o.str();
-  }
-};
-#endif
-
 using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
@@ -212,7 +70,6 @@ int main(int argc, char *argv[]) {
   syslog (LOG_DEBUG, "Another tree falls in a forest");
 
   try {
-    #if 1
     #if 0 // pingu
     // 18: RPI_GPIO_P1_12
     BCM2835 backend { { 17, 27 }, { 18 } };
@@ -222,12 +79,6 @@ int main(int argc, char *argv[]) {
     backend.set_inverted(false);
     #endif
     backend.setup();
-    #else
-    // red lights
-    //Mockup backend(2, 0);
-    // fishtank
-    Mockup backend(4, 1);
-    #endif
     // Check command line arguments.
     if (argc < 4) {
       std::cerr
@@ -620,6 +471,43 @@ server.handle("/", [&backend](const request &req, const response &res) {
         });
         res.end();
       }
+
+      else if(req.method() == "GET") {
+
+        auto path = percent_decode(req.uri().path);
+        if (path == "/") {
+          path = "/index.html";
+        }
+
+        //if (!check_path(path)) {
+        if (path != "/index.html") {
+          res.write_head(404);
+          res.end();
+          return;
+        }
+
+        //path = docroot + path;
+        auto fd = open("index.html", O_RDONLY);
+        if (fd == -1) {
+          res.write_head(404);
+          res.end();
+          return;
+        }
+
+        auto header = header_map();
+
+        struct stat stbuf;
+        if (stat(path.c_str(), &stbuf) == 0) {
+          header.emplace("content-length",
+                        header_value{std::to_string(stbuf.st_size), false});
+          header.emplace("last-modified",
+                        header_value{http_date(stbuf.st_mtime), false});
+        }
+        res.write_head(200, std::move(header));
+        res.end(file_generator_from_fd(fd));
+
+      }
+
       else {
         syslog(LOG_INFO, "unsupported request method for /: %s, returning 400 Bad request", req.method().c_str());
         res.write_head(400);
@@ -705,7 +593,7 @@ server.handle("/", [&backend](const request &req, const response &res) {
 
       boost::asio::io_service &sv = server.io_service();
       //auto task = std::make_unique<PeriodicTask>(sv, "CPU", 5, boost::bind(log_text, "* CPU USAGE"));
-      auto task = std::make_unique<PeriodicTask>(sv, "CPU", 5, [&backend](){ backend.autom(); }, true);
+      auto task = std::make_unique<PeriodicTask>(sv, "Automode Handler", 5, [&backend](){ backend.autom(); }, true);
 
       if (server.listen_and_serve_2(ec, tls, addr, port)) {
         std::cerr << "error: " << ec.message() << std::endl;

@@ -85,3 +85,5 @@ one open/close call per auto run
 command line arguments for initial autorun, or setup only, or switch/pwm stuff
 configurable auto interval
 find out how to daemon / systemd
+config file
+backend parameters also by config file / arguments
