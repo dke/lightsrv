@@ -26,7 +26,8 @@
       // $url="https://d10-dev.lan:8888/v1";
       // $url="https://pingu.lan/v1";
       // $url="https://luci.lan/v1";
-      $url="https://de-x1.lan:8888/v1";
+      // $url="https://de-x1.lan:8888/v1";
+      $url="/v1";
 
       $c = new XMLHttpRequest();
       $c.onreadystatechange = function() {
@@ -82,7 +83,7 @@
               var s = rt.response.switches[i];
 
               var div = document.createElement("div");
-              div.className = (i==0?"custom-control custom-switch":"custom-control custom-switch mt-2");
+              div.className = "custom-control custom-switch mt-2";
 
               var input = document.createElement("input");
               input.type = "checkbox";
@@ -122,12 +123,15 @@
               var pwm = rt.response.pwms[i];
 
               var div = document.createElement("div");
-              div.className = (i==0?"custom-control custom-switch":"custom-control custom-switch mt-2");
+              //div.className = "custom-control custom-switch mt-2";
+              div.className = "mt-2";
 
               // <label for="customRange1">Example range</label>
               var label = document.createElement("label");
               label.htmlFor = "customRange" + i;
               label.innerHTML = "PWM Value " + i;
+              // does not even help: I can't gray out the label?!
+              //label.className = "myclass";
               div.appendChild(label);
 
               // <input type="range" class="custom-range" id="customRange1">
