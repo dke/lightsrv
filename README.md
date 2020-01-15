@@ -69,13 +69,20 @@ $ curl -k --http2 -X PUT -H "Content-Type: application/json" -d '{"on":false}' "
 {"error": {"code": 0}, "request": {"on": false}, "response": {"on": false}}
 ```
 
+### Installation
+
+There is a systemd file. You can install it in `/etc/systemd/system` and enable and start it in the usual way.
+
+This service defintion expects the binary to live in /usr/local/sbin as lightsrv and load the `key.pem` and `cert.pem` files from `/usr/local/etc/lightsrv/`. Furthermore it expects to load `index.html` from its CWD /usr/local/etc/lightsrv.
+
 ### HTML/Javascript client
 
-See `lightui.html`.
+See `index.html`.
 
-Change the `$url` to point to the actual service url.
+The file is delived by the service via the / or /index.html path. You can also copy it statically to a client and change the url in the appropriate location in the file.
 
 In order to work, you need to make the browser accept the self-signed cert. Easiest to do so is to access some sever URL in the browser directly and follow the browsers questions.
+
 
 
 

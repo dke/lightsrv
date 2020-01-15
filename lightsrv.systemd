@@ -1,0 +1,13 @@
+# cat lightsrv.service
+[Unit]
+Description=LightSrv Fishtank Light and Control Service
+After=syslog.target network.target
+Conflicts=
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/lightsrv 0.0.0.0 443 1 /usr/local/etc/lightsrv/key.pem /usr/local/etc/lightsrv/cert.pem
+WorkingDirectory=/usr/local/etc/lightsrv
+
+[Install]
+WantedBy=multi-user.target

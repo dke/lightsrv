@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
     backend.set_inverted(false);
     #endif
     backend.setup();
+    backend.set_auto(true);
     // Check command line arguments.
     if (argc < 4) {
       std::cerr
