@@ -4,8 +4,10 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
-#include <boost/chrono.hpp>
+#include <chrono>
+#include <sstream>
 
+#include "config.h"
 #ifdef bcm2385_found
 #include <bcm2835.h>
 #else
@@ -27,7 +29,7 @@ int BCM2835::pwm_trsf(int arg) {
 }
 
 int BCM2835::init() {
-    //syslog(LOG_DEBUG, "bcm2835_init()\n");
+    syslog(LOG_DEBUG, "bcm2835_init()");
     #ifdef bcm2385_found
     if (!bcm2835_init()) {
         //syslog(LOG_ERR, "FATAL: bcm2835_init() failed.\n");
@@ -39,7 +41,7 @@ int BCM2835::init() {
 }
 
 void BCM2835::close() {
-    //syslog(LOG_DEBUG, "bcm2835_close()\n");
+    syslog(LOG_DEBUG, "bcm2835_close()");
     #ifdef bcm2385_found
     bcm2835_close();
     #else
@@ -66,20 +68,24 @@ void BCM2835::setup() {
     init();
     #ifdef bcm2385_found
     // Set the pins to be output pins
-    //for(unsigned channel=0; channel<channels.size(); channel++) {
     for(auto channel: channels) {
-        //syslog(LOG_DEBUG, "bcm2835_gpio_fsel(%d, %d)", channels[channel], BCM2835_GPIO_FSEL_OUTP);
-        bcm2835_gpio_fsel(channels[channel], BCM2835_GPIO_FSEL_OUTP);
+        syslog(LOG_DEBUG, "bcm2835_gpio_fsel(%d, %d)", channel, BCM2835_GPIO_FSEL_OUTP);
+        bcm2835_gpio_fsel(channel, BCM2835_GPIO_FSEL_OUTP);
     }
 
     //for(auto pwm: pwms) {
     for(unsigned pwm_channel=0; pwm_channel<pwms.size(); pwm_channel++) {
         // Set the pwm pin to Alt Fun 5, to allow PWM channel 0 to be output there
+        syslog(LOG_DEBUG, "bcm2835_gpio_fsel(%d, %d)", pwms[pwm_channel], BCM2835_GPIO_FSEL_ALT5);
         bcm2835_gpio_fsel(pwms[pwm_channel], BCM2835_GPIO_FSEL_ALT5);
+        syslog(LOG_DEBUG, "bcm2835_pwm_set_clock(%d)", BCM2835_PWM_CLOCK_DIVIDER_16);
         bcm2835_pwm_set_clock(BCM2835_PWM_CLOCK_DIVIDER_16);
+        syslog(LOG_DEBUG, "bcm2835_pwm_set_mode(%d, %d, %d)", pwm_channel, 1, 1);
         bcm2835_pwm_set_mode(pwm_channel, 1, 1);
+        syslog(LOG_DEBUG, "bcm2835_pwm_set_range(%d, %d)", pwm_channel, 1024);
         bcm2835_pwm_set_range(pwm_channel, 1024);
         // init to pwm 50%
+        syslog(LOG_DEBUG, "bcm2835_pwm_set_data(%d, %d)", pwm_channel, 512);
         bcm2835_pwm_set_data(pwm_channel, 512);
     }
     #else
@@ -193,9 +199,11 @@ bool BCM2835::autom() {
 
 
 double BCM2835::envelope(unsigned t) const {
-    unsigned t0=t-dotFromString("12:00:00");
+    int t0=t-dotFromString("12:00:00");
     unsigned T=dotFromString("22:00:00")-dotFromString("12:00:00");
-    return std::sin(t0*M_PI/T);
+    double env=std::sin(t0*M_PI/T);
+    syslog(LOG_DEBUG, "envelope: t0=%d, T=%d, phi=%f, env=%f", t0, T, t0*M_PI/T, env);
+    return env;
 }
 double BCM2835::noon(unsigned t) const {
     if(t<dotFromString("15:30:00"))

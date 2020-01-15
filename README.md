@@ -76,3 +76,12 @@ See `lightui.html`.
 Change the `$url` to point to the actual service url.
 
 In order to work, you need to make the browser accept the self-signed cert. Easiest to do so is to access some sever URL in the browser directly and follow the browsers questions.
+
+
+
+## TODO
+
+one open/close call per auto run
+command line arguments for initial autorun, or setup only, or switch/pwm stuff
+configurable auto interval
+find out how to daemon / systemd
