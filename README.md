@@ -83,14 +83,14 @@ The file is delived by the service via the / or /index.html path. You can also c
 
 In order to work, you need to make the browser accept the self-signed cert. Easiest to do so is to access some sever URL in the browser directly and follow the browsers questions.
 
-
-
-
 ## TODO
 
-one open/close call per auto run
-command line arguments for initial autorun, or setup only, or switch/pwm stuff
-configurable auto interval
-find out how to daemon / systemd
-config file
-backend parameters also by config file / arguments
+* one open/close call per auto run
+* command line arguments for initial autorun, or setup only, or switch/* pwm stuff
+* configurable auto interval
+* config file
+* backend parameters also by config file / arguments
+* api level checking to not allow manual controls if auto is active
+* api: input sanitization / checking
+* [DONE] find out how to daemon / systemd
+* [DONE] delivering the HTML file from the lightsrv program itself
