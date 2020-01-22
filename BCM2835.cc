@@ -48,8 +48,8 @@ void BCM2835::close() {
     #endif
 }
 
-BCM2835::BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool inverted, bool debug):
-    inverted(inverted), debug(debug), using_auto(false), channels(c), channel_values(c.size(), inverted), pwms(p), pwm_values(p.size(), 50)
+BCM2835::BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool has_automode, bool inverted, bool debug):
+    has_automode(has_automode), inverted(inverted), debug(debug), using_auto(has_automode), channels(c), channel_values(c.size(), inverted), pwms(p), pwm_values(p.size(), 50)
 {}
 
 void BCM2835::set_debug(bool d) { debug=d; }
@@ -154,7 +154,7 @@ unsigned BCM2835::pwm_size() const {
 
 
 bool BCM2835::has_autom() {
-    return false;
+    return has_automode;
 }
 
 bool BCM2835::autom() {

@@ -12,6 +12,7 @@ class BCM2835 {
     bool inverted;
     bool debug;
     bool using_auto;
+    bool has_automode;
     std::vector<unsigned> channels;
     // "cache" of the actual values we only use for reading if
     // compiled without bcm2385_found, like mockup backend
@@ -28,7 +29,7 @@ class BCM2835 {
 public:
     typedef unsigned dot;
     typedef std::pair<dot, dot> interval;
-    BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool inverted=false, bool debug=false);
+    BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool has_automode=false, bool inverted=false, bool debug=false);
     void set_debug(bool d);
     void set_inverted(bool d);
     void set_auto(bool a);

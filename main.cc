@@ -72,12 +72,12 @@ int main(int argc, char *argv[]) {
   try {
     #if 1 // pingu
     // 18: RPI_GPIO_P1_12
-    // third argument: inverted; default: false
-    BCM2835 backend { { 17, 27 }, { }, true };
-    //backend.set_inverted(true);
+    // third argument: has_automode; default: false
+    // fourth argument: inverted; default: false
+    // fifth argument: debug; default: false
+    BCM2835 backend { { 17, 27 }, { }, true, true };
     #else // luci
-    BCM2835 backend { { 24, 23, 22, 17 }, { 18 } };
-    backend.set_inverted(false);
+    BCM2835 backend { { 24, 23, 22, 17 }, { 18 }, true };
     #endif
     backend.setup();
     backend.set_auto(false);
@@ -591,26 +591,28 @@ server.handle("/", [&backend](const request &req, const response &res) {
     });
     #endif
 
+    std::shared_ptr<boost::asio::ssl::context> ptls(nullptr);
     if (argc >= 6) {
-      boost::asio::ssl::context tls(boost::asio::ssl::context::sslv23);
-      tls.use_private_key_file(argv[4], boost::asio::ssl::context::pem);
-      tls.use_certificate_chain_file(argv[5]);
-
-      configure_tls_context_easy(ec, tls);
-      server.listen_and_serve_1(ec, tls, addr, port);
-
-      boost::asio::io_service &sv = server.io_service();
-      //auto task = std::make_unique<PeriodicTask>(sv, "CPU", 5, boost::bind(log_text, "* CPU USAGE"));
-      auto task = std::make_unique<PeriodicTask>(sv, "Automode Handler", 5, [&backend](){ backend.autom(); }, true);
-
-      if (server.listen_and_serve_2(ec, tls, addr, port)) {
-        std::cerr << "error: " << ec.message() << std::endl;
-      }
-    } else {
-      if (server.listen_and_serve(ec, addr, port)) {
-        std::cerr << "error: " << ec.message() << std::endl;
-      }
+      ptls=std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
+      ptls->use_private_key_file(argv[4], boost::asio::ssl::context::pem);
+      ptls->use_certificate_chain_file(argv[5]);
+      configure_tls_context_easy(ec, *ptls);
     }
+
+    server.reset();
+    boost::asio::io_service &sv = server.io_service();
+    std::shared_ptr<PeriodicTask> task(nullptr);
+    if(backend.has_autom()) {
+      syslog(LOG_INFO, "Installing automode handler with an interval of %d seconds", 5);
+      task = std::make_shared<PeriodicTask>(sv, "Automode Handler", 5, [&backend](){ backend.autom(); }, true);
+    }
+    else {
+      syslog(LOG_INFO, "Not installing automode handler since the backend does not support it");
+    }
+    if (server.no_reset_listen_and_serve(ec, ptls.get(), addr, port)) {
+      std::cerr << "error: " << ec.message() << std::endl;
+    }
+
   } catch (std::exception &e) {
     std::cerr << "exception: " << e.what() << "\n";
   }
