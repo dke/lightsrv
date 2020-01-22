@@ -319,12 +319,12 @@ int main(int argc, char *argv[]) {
         for(unsigned i=0; i<backend.size(); i++) switches.push_back(backend.get_channel(i));
         json11::Json::array pwms;
         for(unsigned i=0; i<backend.pwm_size(); i++) pwms.push_back((int)backend.get_pwm(i));
-	json11::Json::object autoo {
-	  { "available", backend.has_auto() }
-	};
-	if(backend.has_auto()) {
-	  autoo["value"]=backend.get_auto(); }
-	}
+        auto autoo = json11::Json::object  {
+          { "available", backend.has_autom() }
+        };
+        if(backend.has_autom()) {
+          autoo["value"] = backend.get_auto();
+        }
         json11::Json r = json11::Json::object {
           {
             "error", json11::Json::object {

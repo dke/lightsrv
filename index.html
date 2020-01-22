@@ -37,46 +37,47 @@
             var container = document.getElementById("container");
 
             if(rt.response.auto != undefined) { // TODO
-              var a = rt.response.auto;
+              if(rt.response.auto.available) {
+                var div = document.createElement("div");
+                div.className = "custom-control custom-switch";
 
-              var div = document.createElement("div");
-              div.className = "custom-control custom-switch";
-
-              var input = document.createElement("input");
-              input.type = "checkbox";
-              input.className = "custom-control-input";
-              input.id = "auto";
-              input.checked = a;
-              input.addEventListener('click', (e) => {
-                $c = new XMLHttpRequest();
-                $c.onreadystatechange = function() {
-                  if (this.readyState == 4 && this.status == 200) {
-                    var rt = JSON.parse(this.responseText);
-                    if (rt.error.code == 0) {
-                      e.target.checked = rt.response.value;
-                      document.querySelectorAll('.myclass').forEach((element) => {
-                        console.log("should disable: " + element.id);
-                        element.disabled = rt.response.value;
-                      });
+                var input = document.createElement("input");
+                input.type = "checkbox";
+                input.className = "custom-control-input";
+                input.id = "auto";
+                input.checked = rt.response.auto.value;
+                input.addEventListener('click', (e) => {
+                  $c = new XMLHttpRequest();
+                  $c.onreadystatechange = function() {
+                    if (this.readyState == 4 && this.status == 200) {
+                      var rt = JSON.parse(this.responseText);
+                      if (rt.error.code == 0) {
+                        e.target.checked = rt.response.value;
+                        document.querySelectorAll('.myclass').forEach((element) => {
+                          console.log("should disable: " + element.id);
+                          element.disabled = rt.response.value;
+                        });
+                      }
+                      else {
+                        alert("error in response");
+                      }
                     }
-                    else {
-                      alert("error in response");
-                    }
-                  }
-                };
-                $c.open("PUT", $url+'/auto', true);
-                $c.setRequestHeader('Content-type', 'application/json');
-                $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
-              });
-              div.appendChild(input);
+                  };
+                  $c.open("PUT", $url+'/auto', true);
+                  $c.setRequestHeader('Content-type', 'application/json');
+                  $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
+                });
+                div.appendChild(input);
 
-              var label = document.createElement("label");
-              label.className = "custom-control-label";
-              label.htmlFor = "auto";
-              label.innerHTML = "Automatic Mode";
-              div.appendChild(label);
+                var label = document.createElement("label");
+                label.className = "custom-control-label";
+                label.htmlFor = "auto";
+                label.innerHTML = "Automatic Mode";
+                div.appendChild(label);
 
-              container.appendChild(div);
+                container.appendChild(div);
+
+              }
             }
 
             for(var i=0; i<rt.response.switches.length; i++) {
@@ -90,7 +91,7 @@
               input.className = "custom-control-input myclass";
               input.id = "customSwitch" + i;
               input.checked = s==1;
-              input.disabled = rt.response.auto;
+              input.disabled = rt.response.auto.value;
               input.addEventListener('click', (e) => {
                 $c = new XMLHttpRequest();
                 $c.onreadystatechange = function() {
@@ -140,7 +141,7 @@
               input.className = "custom-range myclass";
               input.id = "customRange" + i;
               input.value = pwm;
-              input.disabled = rt.response.auto;
+              input.disabled = rt.response.auto.value;
               input.addEventListener('input', (e) => {
                 $c = new XMLHttpRequest();
                 $c.onreadystatechange = function() {
