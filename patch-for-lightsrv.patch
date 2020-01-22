@@ -27,25 +27,22 @@ index 1190e322..71a2f48b 100644
    const std::vector<int> ports() const;
  
 diff --git a/src/asio_server_http2.cc b/src/asio_server_http2.cc
-index 02d3d197..f563928b 100644
+index 02d3d197..d26c3827 100644
 --- a/src/asio_server_http2.cc
 +++ b/src/asio_server_http2.cc
-@@ -59,11 +59,35 @@ boost::system::error_code http2::listen_and_serve(boost::system::error_code &ec,
+@@ -59,11 +59,27 @@ boost::system::error_code http2::listen_and_serve(boost::system::error_code &ec,
    return impl_->listen_and_serve(ec, nullptr, address, port, asynchronous);
  }
  
-+void http2::listen_and_serve_1(boost::system::error_code &ec,
-+                                                  const std::string &address,
-+                                                  const std::string &port,
-+                                                  bool asynchronous) {
-+  impl_->listen_and_serve_1(ec, nullptr, address, port, asynchronous);
++void http2::reset() {
++  impl_->reset();
 +}
 +
-+boost::system::error_code http2::listen_and_serve_2(boost::system::error_code &ec,
++boost::system::error_code http2::no_reset_listen_and_serve(boost::system::error_code &ec,
 +                                                  const std::string &address,
 +                                                  const std::string &port,
 +                                                  bool asynchronous) {
-+  return impl_->listen_and_serve_2(ec, nullptr, address, port, asynchronous);
++  return impl_->no_reset_listen_and_serve(ec, nullptr, address, port, asynchronous);
 +}
 +
  boost::system::error_code http2::listen_and_serve(
@@ -53,20 +50,15 @@ index 02d3d197..f563928b 100644
      const std::string &address, const std::string &port, bool asynchronous) {
    return impl_->listen_and_serve(ec, &tls_context, address, port, asynchronous);
  }
-+void http2::listen_and_serve_1(
-+    boost::system::error_code &ec, boost::asio::ssl::context &tls_context,
++boost::system::error_code http2::no_reset_listen_and_serve(
++    boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
 +    const std::string &address, const std::string &port, bool asynchronous) {
-+  impl_->listen_and_serve_1(ec, &tls_context, address, port, asynchronous);
-+}
-+boost::system::error_code http2::listen_and_serve_2(
-+    boost::system::error_code &ec, boost::asio::ssl::context &tls_context,
-+    const std::string &address, const std::string &port, bool asynchronous) {
-+  return impl_->listen_and_serve_2(ec, &tls_context, address, port, asynchronous);
++  return impl_->no_reset_listen_and_serve(ec, tls_context, address, port, asynchronous);
 +}
  
  void http2::num_threads(size_t num_threads) { impl_->num_threads(num_threads); }
  
-@@ -90,6 +114,10 @@ http2::io_services() const {
+@@ -90,6 +106,10 @@ http2::io_services() const {
    return impl_->io_services();
  }
  
@@ -78,21 +70,19 @@ index 02d3d197..f563928b 100644
  
  } // namespace server
 diff --git a/src/asio_server_http2_impl.cc b/src/asio_server_http2_impl.cc
-index 00afdd65..c84a5dd1 100644
+index 00afdd65..c76cdb13 100644
 --- a/src/asio_server_http2_impl.cc
 +++ b/src/asio_server_http2_impl.cc
-@@ -52,6 +52,20 @@ boost::system::error_code http2_impl::listen_and_serve(
+@@ -52,6 +52,18 @@ boost::system::error_code http2_impl::listen_and_serve(
                                     mux_, asynchronous);
  }
  
-+void http2_impl::listen_and_serve_1(
-+    boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
-+    const std::string &address, const std::string &port, bool asynchronous) {
++void http2_impl::reset() {
 +  server_.reset(
 +      new server(num_threads_, tls_handshake_timeout_, read_timeout_));
 +}
 +
-+boost::system::error_code http2_impl::listen_and_serve_2(
++boost::system::error_code http2_impl::no_reset_listen_and_serve(
 +    boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
 +    const std::string &address, const std::string &port, bool asynchronous) {
 +  return server_->listen_and_serve(ec, tls_context, address, port, backlog_,
@@ -102,7 +92,7 @@ index 00afdd65..c84a5dd1 100644
  void http2_impl::num_threads(size_t num_threads) { num_threads_ = num_threads; }
  
  void http2_impl::backlog(int backlog) { backlog_ = backlog; }
-@@ -78,6 +92,10 @@ http2_impl::io_services() const {
+@@ -78,6 +90,10 @@ http2_impl::io_services() const {
    return server_->io_services();
  }
  
@@ -114,23 +104,21 @@ index 00afdd65..c84a5dd1 100644
  
  } // namespace server
 diff --git a/src/asio_server_http2_impl.h b/src/asio_server_http2_impl.h
-index 93a6d2cc..46227fe1 100644
+index 93a6d2cc..ea292c8a 100644
 --- a/src/asio_server_http2_impl.h
 +++ b/src/asio_server_http2_impl.h
-@@ -45,6 +45,12 @@ public:
+@@ -45,6 +45,10 @@ public:
    boost::system::error_code listen_and_serve(
        boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
        const std::string &address, const std::string &port, bool asynchronous);
-+  void listen_and_serve_1(
-+      boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
-+      const std::string &address, const std::string &port, bool asynchronous);
-+  boost::system::error_code listen_and_serve_2(
++  void reset();
++  boost::system::error_code no_reset_listen_and_serve(
 +      boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
 +      const std::string &address, const std::string &port, bool asynchronous);
    void num_threads(size_t num_threads);
    void backlog(int backlog);
    void tls_handshake_timeout(const boost::posix_time::time_duration &t);
-@@ -54,6 +60,7 @@ public:
+@@ -54,6 +58,7 @@ public:
    void join();
    const std::vector<std::shared_ptr<boost::asio::io_service>> &
    io_services() const;
@@ -139,42 +127,34 @@ index 93a6d2cc..46227fe1 100644
  
  private:
 diff --git a/src/includes/nghttp2/asio_http2_server.h b/src/includes/nghttp2/asio_http2_server.h
-index d4ec489a..5f509be3 100644
+index d4ec489a..cc8bbb72 100644
 --- a/src/includes/nghttp2/asio_http2_server.h
 +++ b/src/includes/nghttp2/asio_http2_server.h
-@@ -148,6 +148,14 @@ public:
+@@ -148,6 +148,11 @@ public:
                                               const std::string &address,
                                               const std::string &port,
                                               bool asynchronous = false);
-+  void listen_and_serve_1(boost::system::error_code &ec,
-+                                             const std::string &address,
-+                                             const std::string &port,
-+                                             bool asynchronous = false);
-+  boost::system::error_code listen_and_serve_2(boost::system::error_code &ec,
++  void reset();
++  boost::system::error_code no_reset_listen_and_serve(boost::system::error_code &ec,
 +                                             const std::string &address,
 +                                             const std::string &port,
 +                                             bool asynchronous = false);
  
    // Starts listening connection on given address and port and serves
    // incoming requests in SSL/TLS encrypted connection.  For
-@@ -158,6 +166,16 @@ public:
+@@ -158,6 +163,11 @@ public:
                     boost::asio::ssl::context &tls_context,
                     const std::string &address, const std::string &port,
                     bool asynchronous = false);
-+  void
-+  listen_and_serve_1(boost::system::error_code &ec,
-+                   boost::asio::ssl::context &tls_context,
-+                   const std::string &address, const std::string &port,
-+                   bool asynchronous = false);
 +  boost::system::error_code
-+  listen_and_serve_2(boost::system::error_code &ec,
-+                   boost::asio::ssl::context &tls_context,
++  no_reset_listen_and_serve(boost::system::error_code &ec,
++                   boost::asio::ssl::context *tls_context,
 +                   const std::string &address, const std::string &port,
 +                   bool asynchronous = false);
  
    // Registers request handler |cb| with path pattern |pattern|.  This
    // function will fail and returns false if same pattern has been
-@@ -214,6 +232,8 @@ public:
+@@ -214,6 +224,8 @@ public:
    const std::vector<std::shared_ptr<boost::asio::io_service>> &
    io_services() const;
  
