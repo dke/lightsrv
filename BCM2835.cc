@@ -35,7 +35,6 @@ int BCM2835::init() {
         //syslog(LOG_ERR, "FATAL: bcm2835_init() failed.\n");
         return 1;
     }
-    #else
     #endif
     return 0;
 }
@@ -49,8 +48,16 @@ void BCM2835::close() {
 }
 
 BCM2835::BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool has_automode, bool inverted, bool debug):
-    has_automode(has_automode), inverted(inverted), debug(debug), using_auto(has_automode), channels(c), channel_values(c.size(), inverted), pwms(p), pwm_values(p.size(), 50)
-{}
+    inverted(inverted), debug(debug), using_auto(has_automode), has_automode(has_automode), channels(c), channel_values(c.size(), inverted), pwms(p), pwm_values(p.size(), 50)
+{
+    autocommit.push_back(true);
+}
+
+BCM2835::BCM2835(const std::vector<unsigned> &c, const std::vector<unsigned> &p, bool has_automode, bool inverted, bool debug):
+    inverted(inverted), debug(debug), using_auto(has_automode), has_automode(has_automode), channels(c), channel_values(c.size(), inverted), pwms(p), pwm_values(p.size(), 50)
+{
+    autocommit.push_back(true);
+}
 
 void BCM2835::set_debug(bool d) { debug=d; }
 
@@ -98,26 +105,26 @@ int BCM2835::switch_channel(unsigned channel, int value) {
     if(channel>channels.size())
         return -1;
     if(inverted) value = o_trsf(value);
-    init();
+    if(autocommit.back()) init();
     #ifdef bcm2385_found
     bcm2835_gpio_write(channels[channel], value);
     #else
     channel_values[channel]=value;
     #endif
-    close();
+    if(autocommit.back()) close();
     return 0;
 }
 
 int BCM2835::get_channel(unsigned channel) {
     if(channel>channels.size())
         return -1;
-    init();
+    if(autocommit.back()) init();
     #ifdef bcm2385_found
     int value = bcm2835_gpio_lev(channels[channel]);
     #else
     int value = channel_values[channel];
     #endif
-    close();
+    if(autocommit.back()) close();
     if(inverted) value=i_trsf(value);
     return value;
 }
@@ -131,9 +138,10 @@ unsigned BCM2835::get_pwm(unsigned channel) {
 }
 
 unsigned BCM2835::set_pwm(unsigned channel, unsigned p) {
-    init();
+    if(autocommit.back()) init();
     // TODO more rigid error handling
-    if(channel>pwms.size()) {
+    if(channel>=pwms.size()) {
+        syslog(LOG_ERR, "pwm channel index %d too large (pwms.size(): %d)", channel, (int)pwms.size());
         return 0;
     }
     //syslog(LOG_DEBUG, "bcm2835_pwm_set_data(%d, %d)", channel, pwm_trsf(p));
@@ -142,7 +150,7 @@ unsigned BCM2835::set_pwm(unsigned channel, unsigned p) {
     #else
     #endif
     pwm_values[channel]=p;
-    close();
+    if(autocommit.back()) close();
     return p;
 }
 
@@ -169,6 +177,9 @@ bool BCM2835::autom() {
     timeinfo = localtime ( &rawtime );
     syslog(LOG_DEBUG, "reference: %s", asctime(timeinfo));
     #endif
+
+    autocommit.push_back(false);
+    init();
 
     dot dotNow = dotFromNow();
 
@@ -198,9 +209,10 @@ bool BCM2835::autom() {
     switch_channel(2, true);
     // co2
     switch_channel(3, co2On);
+    autocommit.pop_back();
+    close();
     return true;
 }
-
 
 double BCM2835::envelope(unsigned t) const {
     int t0=t-dotFromString("12:00:00");
@@ -209,6 +221,7 @@ double BCM2835::envelope(unsigned t) const {
     syslog(LOG_DEBUG, "envelope: t0=%d, T=%d, phi=%f, env=%f", t0, T, t0*M_PI/T, env);
     return env;
 }
+
 double BCM2835::noon(unsigned t) const {
     if(t<dotFromString("15:30:00"))
         return 1;
@@ -264,4 +277,13 @@ std::string BCM2835::formatDot(dot t) const {
     std::ostringstream o;
     o << boost::format ("%02d:%02d:%02d") % h % m % s;
     return o.str();
+}
+
+
+void BCM2835::push_autocommit(bool a) {
+    autocommit.push_back(a);
+}
+
+void BCM2835::pop_autocommit() {
+    autocommit.pop_back();
 }

@@ -39,6 +39,7 @@
 #include <ctime>
 
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -49,6 +50,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
+#include <boost/program_options.hpp>
 
 #include <nghttp2/asio_http2_server.h>
 
@@ -61,8 +63,80 @@ using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
 int main(int argc, char *argv[]) {
-  //setlogmask (LOG_UPTO (LOG_INFO));
-  setlogmask (LOG_UPTO (LOG_DEBUG));
+
+  boost::program_options::options_description generic("Cmdline options");
+  generic.add_options()
+    ("help,h", "produce help message")
+    ("config,C", boost::program_options::value<std::string>()->default_value("lightsrv.conf"), "config file")
+  ;
+
+  // Declare the supported options.
+  boost::program_options::options_description desc("Program options");
+  desc.add_options()
+    ("bind,b", boost::program_options::value<std::string>()->default_value("0.0.0.0"), "bind addr")
+    ("port,p", boost::program_options::value<std::string>()->default_value("443"), "listening port")
+    ("threads,t", boost::program_options::value<unsigned>()->default_value(1), "number of threads")
+    ("root,r", boost::program_options::value<std::string>()->default_value("."), "docroot for index.html")
+    ("key,k", boost::program_options::value<std::string>()->default_value("key.pem"), "private key file")
+    ("cert,c", boost::program_options::value<std::string>()->default_value("cert.pem"), "cert file")
+    ("debug,d", "enable debug logging")
+    ("auto,a", "backend: enable automatic mode")
+    ("interval,i", boost::program_options::value<unsigned>()->default_value(60), "set compression level")
+    ("switch,s", boost::program_options::value<std::string>()->default_value(""), "set switch gpio channels")
+    ("pwm,w", boost::program_options::value<std::string>()->default_value(""), "set pwm gpio channels")
+    ("inverted,I", "switch channels inverted logic")
+  ;
+
+  boost::program_options::options_description cmdline_options;
+  cmdline_options.add(generic).add(desc);
+
+  boost::program_options::variables_map vm;
+
+  //boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+  boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(cmdline_options).run(), vm);
+  boost::program_options::notify(vm);
+
+  boost::program_options::options_description config_file_options;
+  config_file_options.add(desc);
+  std::ifstream configfile(vm["config"].as<std::string>());
+  if(configfile) {
+    boost::program_options::store(boost::program_options::parse_config_file(configfile, config_file_options), vm);
+    boost::program_options::notify(vm);
+  }
+
+  boost::program_options::options_description visible("Allowed options");
+  visible.add(generic).add(desc);
+
+  if (vm.count("help")) {
+    std::cout << visible << "\n";
+    return 0;
+  }
+
+  std::string addr = vm["bind"].as<std::string>();
+  std::string port = vm["port"].as<std::string>();
+  std::size_t num_threads = vm["threads"].as<unsigned>();
+  std::string docroot = vm["root"].as<std::string>();
+  std::string key_file = vm["key"].as<std::string>();
+  std::string cert_file = vm["cert"].as<std::string>();
+  bool debug = vm.count("debug")>0;
+  bool has_auto_mode = vm.count("auto")>0;
+  unsigned auto_interval = vm["interval"].as<unsigned>();
+  bool inverted = vm.count("inverted")>0;
+  std::vector<std::string> switches_str;
+  if(vm["switch"].as<std::string>()!="") boost::split(switches_str, vm["switch"].as<std::string>(), boost::is_any_of(","));
+  std::vector<std::string> pwms_str;
+  if(vm["pwm"].as<std::string>()!="") boost::split(pwms_str, vm["pwm"].as<std::string>(), boost::is_any_of(","));
+
+  std::vector<unsigned> switches;
+  switches.resize(switches_str.size());
+  std::transform(switches_str.begin(), switches_str.end(), switches.begin(), [](const std::string &s){ return std::stoi(s); });
+
+  std::vector<unsigned> pwms;
+  pwms.resize(pwms_str.size());
+  std::transform(pwms_str.begin(), pwms_str.end(), pwms.begin(), [](const std::string &s){  return std::stoi(s); });
+
+  if(debug) setlogmask (LOG_UPTO (LOG_DEBUG));
+  else setlogmask (LOG_UPTO (LOG_INFO));
   openlog ("lightsrv", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
 
   syslog (LOG_NOTICE, "Program started by User %d", getuid ());
@@ -70,30 +144,24 @@ int main(int argc, char *argv[]) {
   syslog (LOG_DEBUG, "Another tree falls in a forest");
 
   try {
-    #if 1 // pingu
+    BCM2835 backend { switches, pwms, has_auto_mode, inverted, debug };
+    #if 0 // pingu
     // 18: RPI_GPIO_P1_12
     // third argument: has_automode; default: false
     // fourth argument: inverted; default: false
     // fifth argument: debug; default: false
     BCM2835 backend { { 17, 27 }, { }, true, true };
-    #else // luci
-    BCM2835 backend { { 24, 23, 22, 17 }, { 18 }, true };
+    #endif
+    #if 0 // luci
+    BCM2835 backend { { 24, 23, 22, 17 }, { 18 }, true, false };
     #endif
     backend.setup();
-    backend.set_auto(false);
-    // Check command line arguments.
-    if (argc < 4) {
-      std::cerr
-          << "Usage: lightsrv <address> <port> <threads> [<private-key-file> "
-          << "<cert-file>]\n";
-      return 1;
-    }
 
     boost::system::error_code ec;
 
-    std::string addr = argv[1];
-    std::string port = argv[2];
-    std::size_t num_threads = std::stoi(argv[3]);
+    //std::string addr = argv[1];
+    //std::string port = argv[2];
+    //std::size_t num_threads = std::stoi(argv[3]);
 
     http2 server;
 
@@ -134,7 +202,16 @@ int main(int argc, char *argv[]) {
           json11::Json body = json11::Json::parse(raw_body, err);
           if(err.empty()) {
             bool value = body["on"].bool_value();
+
+            backend.push_autocommit(false);
+            backend.init();
+
             backend.switch_channel(channel, value);
+            auto retval = backend.get_channel(channel);
+
+            backend.close();
+            backend.pop_autocommit();
+
             res.write_head(200, {
               {"content-type", {"application/json", false}},
               {"Access-Control-Allow-Origin", {"*", false}}
@@ -148,7 +225,7 @@ int main(int argc, char *argv[]) {
               { "request", json11::Json::object { { "on", value } } },
               {
                 "response", json11::Json::object {
-                  { "on", backend.get_channel(channel) }
+                  { "on", retval }
                 }
               }
             };
@@ -233,7 +310,16 @@ int main(int argc, char *argv[]) {
           json11::Json body = json11::Json::parse(raw_body, err);
           if(err.empty()) {
             int value = body["value"].int_value();
+
+            backend.push_autocommit(false);
+            backend.init();
+
             backend.set_pwm(channel, value);
+            auto retval = backend.get_pwm(channel);
+
+            backend.close();
+            backend.pop_autocommit();
+
             res.write_head(200, {
               {"content-type", {"application/json", false}},
               {"Access-Control-Allow-Origin", {"*", false}}
@@ -247,7 +333,7 @@ int main(int argc, char *argv[]) {
               { "request", json11::Json::object { { "value", value } } },
               {
                 "response", json11::Json::object {
-                  { "value", (int)backend.get_pwm(channel) }
+                  { "value", (int)retval }
                 }
               }
             };
@@ -315,10 +401,18 @@ int main(int argc, char *argv[]) {
           {"content-type", {"application/json", false}},
           {"Access-Control-Allow-Origin", {"*", false}}
         });
+
+        backend.push_autocommit(false);
+        backend.init();
+
         json11::Json::array switches;
         for(unsigned i=0; i<backend.size(); i++) switches.push_back(backend.get_channel(i));
         json11::Json::array pwms;
         for(unsigned i=0; i<backend.pwm_size(); i++) pwms.push_back((int)backend.get_pwm(i));
+
+        backend.close();
+        backend.pop_autocommit();
+
         auto autoo = json11::Json::object  {
           { "available", backend.has_autom() }
         };
@@ -428,10 +522,6 @@ int main(int argc, char *argv[]) {
           {"content-type", {"application/json", false}},
           {"Access-Control-Allow-Origin", {"*", false}}
         });
-        json11::Json::array switches;
-        for(unsigned i=0; i<backend.size(); i++) switches.push_back(backend.get_channel(i));
-        json11::Json::array pwms;
-        for(unsigned i=0; i<backend.pwm_size(); i++) pwms.push_back((int)backend.get_pwm(i));
         json11::Json r = json11::Json::object {
           {
             "error", json11::Json::object {
@@ -465,7 +555,7 @@ int main(int argc, char *argv[]) {
 
     });
 
-server.handle("/", [&backend](const request &req, const response &res) {
+    server.handle("/", [&backend, &docroot](const request &req, const response &res) {
       syslog(LOG_DEBUG, "in / handler");
       syslog(LOG_INFO, "received %s %s request", req.method().c_str(), req.uri().path.c_str());
 
@@ -494,8 +584,8 @@ server.handle("/", [&backend](const request &req, const response &res) {
           return;
         }
 
-        //path = docroot + path;
-        auto fd = open("index.html", O_RDONLY);
+        path = docroot + "/" + path;
+        auto fd = open(path.c_str(), O_RDONLY);
         if (fd == -1) {
           res.write_head(404);
           res.end();
@@ -592,10 +682,10 @@ server.handle("/", [&backend](const request &req, const response &res) {
     #endif
 
     std::shared_ptr<boost::asio::ssl::context> ptls(nullptr);
-    if (argc >= 6) {
+    if (port != "80") {
       ptls=std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
-      ptls->use_private_key_file(argv[4], boost::asio::ssl::context::pem);
-      ptls->use_certificate_chain_file(argv[5]);
+      ptls->use_private_key_file(key_file, boost::asio::ssl::context::pem);
+      ptls->use_certificate_chain_file(cert_file);
       configure_tls_context_easy(ec, *ptls);
     }
 
@@ -603,8 +693,8 @@ server.handle("/", [&backend](const request &req, const response &res) {
     boost::asio::io_service &sv = server.io_service();
     std::shared_ptr<PeriodicTask> task(nullptr);
     if(backend.has_autom()) {
-      syslog(LOG_INFO, "Installing automode handler with an interval of %d seconds", 5);
-      task = std::make_shared<PeriodicTask>(sv, "Automode Handler", 5, [&backend](){ backend.autom(); }, true);
+      syslog(LOG_INFO, "Installing automode handler with an interval of %d seconds", auto_interval);
+      task = std::make_shared<PeriodicTask>(sv, "Automode Handler", auto_interval, [&backend](){ backend.autom(); }, true);
     }
     else {
       syslog(LOG_INFO, "Not installing automode handler since the backend does not support it");

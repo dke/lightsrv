@@ -13,6 +13,7 @@ class BCM2835 {
     bool debug;
     bool using_auto;
     bool has_automode;
+    std::vector<bool> autocommit;
     std::vector<unsigned> channels;
     // "cache" of the actual values we only use for reading if
     // compiled without bcm2385_found, like mockup backend
@@ -24,12 +25,11 @@ class BCM2835 {
     int o_trsf(int arg);
     int i_trsf(int arg);
     int pwm_trsf(int arg);
-    int init();
-    void close();
 public:
     typedef unsigned dot;
     typedef std::pair<dot, dot> interval;
     BCM2835(std::initializer_list<unsigned> c, std::initializer_list<unsigned> p, bool has_automode=false, bool inverted=false, bool debug=false);
+    BCM2835(const std::vector<unsigned> &c, const std::vector<unsigned> &p, bool has_automode=false, bool inverted=false, bool debug=false);
     void set_debug(bool d);
     void set_inverted(bool d);
     void set_auto(bool a);
@@ -43,6 +43,10 @@ public:
     unsigned pwm_size() const;
     bool has_autom();
     bool autom();
+    void push_autocommit(bool);
+    void pop_autocommit();
+    int init();
+    void close();
 private:
     double envelope(unsigned t) const;
     double noon(unsigned t) const;
