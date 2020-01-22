@@ -40,6 +40,7 @@ public:
     unsigned get_pwm(unsigned channel);
     unsigned set_pwm(unsigned channel, unsigned p);
     unsigned pwm_size() const;
+    bool has_autom();
     bool autom();
 private:
     double envelope(unsigned t) const;

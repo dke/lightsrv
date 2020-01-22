@@ -70,16 +70,17 @@ int main(int argc, char *argv[]) {
   syslog (LOG_DEBUG, "Another tree falls in a forest");
 
   try {
-    #if 0 // pingu
+    #if 1 // pingu
     // 18: RPI_GPIO_P1_12
-    BCM2835 backend { { 17, 27 }, { 18 } };
-    backend.set_inverted(true);
+    // third argument: inverted; default: false
+    BCM2835 backend { { 17, 27 }, { }, true };
+    //backend.set_inverted(true);
     #else // luci
     BCM2835 backend { { 24, 23, 22, 17 }, { 18 } };
     backend.set_inverted(false);
     #endif
     backend.setup();
-    backend.set_auto(true);
+    backend.set_auto(false);
     // Check command line arguments.
     if (argc < 4) {
       std::cerr
@@ -318,6 +319,12 @@ int main(int argc, char *argv[]) {
         for(unsigned i=0; i<backend.size(); i++) switches.push_back(backend.get_channel(i));
         json11::Json::array pwms;
         for(unsigned i=0; i<backend.pwm_size(); i++) pwms.push_back((int)backend.get_pwm(i));
+	json11::Json::object autoo {
+	  { "available", backend.has_auto() }
+	};
+	if(backend.has_auto()) {
+	  autoo["value"]=backend.get_auto(); }
+	}
         json11::Json r = json11::Json::object {
           {
             "error", json11::Json::object {
@@ -328,7 +335,7 @@ int main(int argc, char *argv[]) {
             "response", json11::Json::object {
               { "switches", switches },
               { "pwms", pwms },
-              { "auto", backend.get_auto() }
+              { "auto", autoo }
             }
           }
         };

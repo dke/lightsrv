@@ -153,6 +153,10 @@ unsigned BCM2835::pwm_size() const {
 #include <ctime>
 
 
+bool BCM2835::has_autom() {
+    return false;
+}
+
 bool BCM2835::autom() {
     if(!using_auto) {
         syslog(LOG_INFO, "not using_auto: skipping automatic stuff");
