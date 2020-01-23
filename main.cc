@@ -62,6 +62,38 @@
 using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
+static std::function<ssize_t(uint8_t *buf, std::size_t buf_len, uint32_t *data_flags)> createGeneratorCb(std::istream& istr) {
+  return [&istr](uint8_t *buf, std::size_t buf_len, uint32_t *data_flags) -> ssize_t {
+    istr.read((char*)buf, buf_len);
+    unsigned tx_len = istr.gcount();
+    if(!istr) *data_flags |= NGHTTP2_DATA_FLAG_EOF;
+    return tx_len;
+  };
+}
+
+static std::string parse_json_arry(const std::vector<unsigned int> &vec, const std::string &arg, const std::string &prefix) {
+  if(arg!="") {
+    std::string err;
+    json11::Json parsed = json11::Json::parse(arg, err);
+    if(err.empty()) {
+      return parsed.dump();
+    }
+    else {
+      syslog(LOG_ERR, "switch-names argument seems to be no valid json, replacing by default.");
+      // drop through
+    }
+  }
+  else {
+    syslog(LOG_DEBUG, "switch-names argument not provided, using default.");
+    // drop through
+  }
+  json11::Json::array a;
+  for(auto i: vec) {
+    a.push_back(prefix + std::to_string(i));
+  }
+  return json11::Json(a).dump();  
+}
+
 int main(int argc, char *argv[]) {
 
   boost::program_options::options_description generic("Cmdline options");
@@ -84,6 +116,8 @@ int main(int argc, char *argv[]) {
     ("interval,i", boost::program_options::value<unsigned>()->default_value(60), "set compression level")
     ("switch,s", boost::program_options::value<std::string>()->default_value(""), "set switch gpio channels")
     ("pwm,w", boost::program_options::value<std::string>()->default_value(""), "set pwm gpio channels")
+    ("switch-names", boost::program_options::value<std::string>()->default_value(""), "set switch names (JSON array of strings)")
+    ("pwm-names", boost::program_options::value<std::string>()->default_value(""), "set pwm names (JSON array of strings)")
     ("inverted,I", "switch channels inverted logic")
   ;
 
@@ -112,13 +146,22 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  bool debug = vm.count("debug")>0;
+
+  if(debug) setlogmask (LOG_UPTO (LOG_DEBUG));
+  else setlogmask (LOG_UPTO (LOG_INFO));
+  openlog ("lightsrv", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
+
+  syslog (LOG_NOTICE, "Program started by User %d", getuid ());
+  syslog (LOG_INFO, "A tree falls in a forest");
+  syslog (LOG_DEBUG, "Another tree falls in a forest");
+
   std::string addr = vm["bind"].as<std::string>();
   std::string port = vm["port"].as<std::string>();
   std::size_t num_threads = vm["threads"].as<unsigned>();
   std::string docroot = vm["root"].as<std::string>();
   std::string key_file = vm["key"].as<std::string>();
   std::string cert_file = vm["cert"].as<std::string>();
-  bool debug = vm.count("debug")>0;
   bool has_auto_mode = vm.count("auto")>0;
   unsigned auto_interval = vm["interval"].as<unsigned>();
   bool inverted = vm.count("inverted")>0;
@@ -135,46 +178,19 @@ int main(int argc, char *argv[]) {
   pwms.resize(pwms_str.size());
   std::transform(pwms_str.begin(), pwms_str.end(), pwms.begin(), [](const std::string &s){  return std::stoi(s); });
 
-  if(debug) setlogmask (LOG_UPTO (LOG_DEBUG));
-  else setlogmask (LOG_UPTO (LOG_INFO));
-  openlog ("lightsrv", LOG_CONS | LOG_PID | LOG_NDELAY, LOG_LOCAL1);
-
-  syslog (LOG_NOTICE, "Program started by User %d", getuid ());
-  syslog (LOG_INFO, "A tree falls in a forest");
-  syslog (LOG_DEBUG, "Another tree falls in a forest");
+  std::string switch_names = parse_json_arry(switches, vm["switch-names"].as<std::string>(), "Switch ");
+  std::string pwm_names = parse_json_arry(pwms, vm["pwm-names"].as<std::string>(), "PWM ");
+  syslog(LOG_DEBUG, "switch_names: %s", switch_names.c_str());
+  syslog(LOG_DEBUG, "pwm_names: %s", pwm_names.c_str());
 
   try {
     BCM2835 backend { switches, pwms, has_auto_mode, inverted, debug };
-    #if 0 // pingu
-    // 18: RPI_GPIO_P1_12
-    // third argument: has_automode; default: false
-    // fourth argument: inverted; default: false
-    // fifth argument: debug; default: false
-    BCM2835 backend { { 17, 27 }, { }, true, true };
-    #endif
-    #if 0 // luci
-    BCM2835 backend { { 24, 23, 22, 17 }, { 18 }, true, false };
-    #endif
     backend.setup();
 
     boost::system::error_code ec;
 
-    //std::string addr = argv[1];
-    //std::string port = argv[2];
-    //std::size_t num_threads = std::stoi(argv[3]);
-
     http2 server;
-
     server.num_threads(num_threads);
-
-    #if 0
-    server.handle("/", [](const request &req, const response &res) {
-      (void)req;
-      syslog(LOG_DEBUG, "in / handler");
-      res.write_head(200, {{"foo", {"bar", false}}});
-      res.end("hello, world\n");
-    });
-    #endif
 
     server.handle("/v1/switch/", [&backend](const request &req, const response &res) {
       syslog(LOG_DEBUG, "in /v1/switch/ handler");
@@ -454,7 +470,7 @@ int main(int argc, char *argv[]) {
 
     });
 
-    server.handle("/v1/auto", [&backend](const request &req, const response &res) {
+    server.handle("/v1/auto", [&backend, &switch_names, &pwm_names](const request &req, const response &res) {
       syslog(LOG_DEBUG, "in /v1/auto handler");
       syslog(LOG_INFO, "received %s %s request", req.method().c_str(), req.uri().path.c_str());
 
@@ -555,7 +571,7 @@ int main(int argc, char *argv[]) {
 
     });
 
-    server.handle("/", [&backend, &docroot](const request &req, const response &res) {
+    server.handle("/", [&backend, &docroot, &switch_names, &pwm_names](const request &req, const response &res) {
       syslog(LOG_DEBUG, "in / handler");
       syslog(LOG_INFO, "received %s %s request", req.method().c_str(), req.uri().path.c_str());
 
@@ -577,33 +593,46 @@ int main(int argc, char *argv[]) {
           path = "/index.html";
         }
 
-        //if (!check_path(path)) {
         if (path != "/index.html") {
+          syslog(LOG_ERR, "Request for non-whitelisted file: %s, returning 404 Not found", path.c_str());
           res.write_head(404);
           res.end();
           return;
         }
 
         path = docroot + "/" + path;
-        auto fd = open(path.c_str(), O_RDONLY);
-        if (fd == -1) {
+        std::ifstream t(path);
+        if(!t.good()) {
+          syslog(LOG_ERR, "Cannot open %s: %s, returning 404 Not found", path.c_str(), strerror(errno));
           res.write_head(404);
           res.end();
           return;
         }
 
-        auto header = header_map();
+        std::string str;
 
+        t.seekg(0, std::ios::end);   
+        str.reserve(t.tellg());
+        t.seekg(0, std::ios::beg);
+
+        str.assign((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+
+        boost::replace_all(str, "\"%%SWITCH_NAMES%%\"", switch_names);
+        boost::replace_all(str, "\"%%PWM_NAMES%%\"", pwm_names);
+
+        std::istringstream istr(str);
+
+        auto header = header_map();
         struct stat stbuf;
         if (stat(path.c_str(), &stbuf) == 0) {
           header.emplace("content-length",
-                        header_value{std::to_string(stbuf.st_size), false});
+                        header_value{std::to_string(str.size()), false});
           header.emplace("last-modified",
                         header_value{http_date(stbuf.st_mtime), false});
         }
         res.write_head(200, std::move(header));
-        res.end(file_generator_from_fd(fd));
-
+        res.end(createGeneratorCb(istr));
       }
 
       else {

@@ -23,11 +23,9 @@
     </div>
 
     <script>
-      // $url="https://d10-dev.lan:8888/v1";
-      // $url="https://pingu.lan/v1";
-      // $url="https://luci.lan/v1";
-      // $url="https://de-x1.lan:8888/v1";
-      $url="/v1";
+      var url="/v1";
+      var switch_names = "%%SWITCH_NAMES%%";
+      var pwm_names = "%%PWM_NAMES%%";
 
       $c = new XMLHttpRequest();
       $c.onreadystatechange = function() {
@@ -63,7 +61,7 @@
                       }
                     }
                   };
-                  $c.open("PUT", $url+'/auto', true);
+                  $c.open("PUT", url+'/auto', true);
                   $c.setRequestHeader('Content-type', 'application/json');
                   $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
                 });
@@ -114,7 +112,7 @@
               var label = document.createElement("label");
               label.className = "custom-control-label";
               label.htmlFor = "customSwitch" + i;
-              label.innerHTML = (i==0?"Emma":"Simon"); // "Switch " + i;
+              label.innerHTML = switch_names[i];
               div.appendChild(label);
 
               container.appendChild(div);
@@ -130,7 +128,7 @@
               // <label for="customRange1">Example range</label>
               var label = document.createElement("label");
               label.htmlFor = "customRange" + i;
-              label.innerHTML = "PWM Value " + i;
+              label.innerHTML = pwm_names[i];
               // does not even help: I can't gray out the label?!
               //label.className = "myclass";
               div.appendChild(label);
@@ -155,7 +153,7 @@
                     }
                   }
                 };
-                $c.open("PUT", $url+'/pwm/'+parseInt(e.target.id.substring(11),10), true);
+                $c.open("PUT", url+'/pwm/'+parseInt(e.target.id.substring(11),10), true);
                 $c.setRequestHeader('Content-type', 'application/json');
                 $c.send('{"value":'+e.target.value+'}');
               });
@@ -171,7 +169,7 @@
         }
       };
 
-      $c.open("GET", $url+'/list', true);
+      $c.open("GET", url+'/list', true);
       $c.setRequestHeader('Content-type', 'application/json');
       $c.send();
    </script>
