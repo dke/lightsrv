@@ -103,7 +103,7 @@
                     }
                   }
                 };
-                $c.open("PUT", $url+'/switch/'+parseInt(e.target.id.substring(12),10), true);
+                $c.open("PUT", url+'/switch/'+parseInt(e.target.id.substring(12),10), true);
                 $c.setRequestHeader('Content-type', 'application/json');
                 $c.send('{"on":'+(e.target.checked?'true':'false')+'}');
               });

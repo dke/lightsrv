@@ -6,7 +6,7 @@ Conflicts=
 
 [Service]
 Type=simple
-ExecStart=/usr/local/sbin/lightsrv 0.0.0.0 443 1 /usr/local/etc/lightsrv/key.pem /usr/local/etc/lightsrv/cert.pem
+ExecStart=/usr/local/sbin/lightsrv -C /usr/local/etc/lightsrv/lightsrv.conf
 WorkingDirectory=/usr/local/etc/lightsrv
 
 [Install]
