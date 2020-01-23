@@ -62,11 +62,11 @@
 using namespace nghttp2::asio_http2;
 using namespace nghttp2::asio_http2::server;
 
-static std::function<ssize_t(uint8_t *buf, std::size_t buf_len, uint32_t *data_flags)> createGeneratorCb(std::istream& istr) {
-  return [&istr](uint8_t *buf, std::size_t buf_len, uint32_t *data_flags) -> ssize_t {
-    istr.read((char*)buf, buf_len);
-    unsigned tx_len = istr.gcount();
-    if(!istr) *data_flags |= NGHTTP2_DATA_FLAG_EOF;
+static std::function<ssize_t(uint8_t *buf, std::size_t buf_len, uint32_t *data_flags)> createGeneratorCb(std::istream *istr) {
+  return [istr](uint8_t *buf, std::size_t buf_len, uint32_t *data_flags) -> ssize_t {
+    istr->read((char*)buf, buf_len);
+    unsigned tx_len = istr->gcount();
+    if(!(*istr)) *data_flags |= NGHTTP2_DATA_FLAG_EOF;
     return tx_len;
   };
 }
@@ -95,6 +95,7 @@ static std::string parse_json_arry(const std::vector<unsigned int> &vec, const s
 }
 
 int main(int argc, char *argv[]) {
+  auto time_server_start = std::time(nullptr);
 
   boost::program_options::options_description generic("Cmdline options");
   generic.add_options()
@@ -571,7 +572,7 @@ int main(int argc, char *argv[]) {
 
     });
 
-    server.handle("/", [&backend, &docroot, &switch_names, &pwm_names](const request &req, const response &res) {
+    server.handle("/", [&backend, &docroot, &switch_names, &pwm_names, time_server_start](const request &req, const response &res) {
       syslog(LOG_DEBUG, "in / handler");
       syslog(LOG_INFO, "received %s %s request", req.method().c_str(), req.uri().path.c_str());
 
@@ -617,19 +618,30 @@ int main(int argc, char *argv[]) {
 
         str.assign((std::istreambuf_iterator<char>(t)),
                     std::istreambuf_iterator<char>());
+        t.close();
 
         boost::replace_all(str, "\"%%SWITCH_NAMES%%\"", switch_names);
         boost::replace_all(str, "\"%%PWM_NAMES%%\"", pwm_names);
 
-        std::istringstream istr(str);
+        std::istringstream *istr=new std::istringstream(str);
+
+        res.on_close([istr](uint32_t cause){
+          (void)cause;
+          delete istr;
+        });
 
         auto header = header_map();
         struct stat stbuf;
         if (stat(path.c_str(), &stbuf) == 0) {
           header.emplace("content-length",
+                        //header_value{std::to_string(stbuf.st_size), false});
                         header_value{std::to_string(str.size()), false});
+          // in principle that would be the modification date of the index.html file or the config file or the server binary
+          // maybe server restart time is a reasonable approximation?
           header.emplace("last-modified",
-                        header_value{http_date(stbuf.st_mtime), false});
+                        header_value{http_date(time_server_start), false});
+                        //header_value{http_date(std::time(nullptr)), false});
+                        //header_value{http_date(stbuf.st_mtime), false});
         }
         res.write_head(200, std::move(header));
         res.end(createGeneratorCb(istr));
