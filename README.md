@@ -71,9 +71,15 @@ $ curl -k --http2 -X PUT -H "Content-Type: application/json" -d '{"on":false}' "
 
 ### Installation
 
-There is a systemd file. You can install it in `/etc/systemd/system` and enable and start it in the usual way.
+In your build directory:
 
-This service defintion expects the binary to live in /usr/local/sbin as lightsrv and load the `key.pem` and `cert.pem` files from `/usr/local/etc/lightsrv/`. Furthermore it expects to load `index.html` from its CWD /usr/local/etc/lightsrv.
+```
+ninja install
+```
+
+This installs the binary, the selfsigned key / cert, the `index.html` file, and the systemd service file.
+
+You can invoke with with a `DESTDIR` environment variable set to install it into a staging area for transferring to other hosts.
 
 ### HTML/Javascript client
 
@@ -85,12 +91,12 @@ In order to work, you need to make the browser accept the self-signed cert. Easi
 
 ## TODO
 
-* one open/close call per auto run
 * command line arguments for initial autorun, or setup only, or switch/* pwm stuff
-* configurable auto interval
-* config file
-* backend parameters also by config file / arguments
 * api level checking to not allow manual controls if auto is active
 * api: input sanitization / checking
+* [DONE] one open/close call per auto run
+* [DONE] configurable auto interval
+* [DONE] config file
+* [DONE] backend parameters also by config file / arguments
 * [DONE] find out how to daemon / systemd
 * [DONE] delivering the HTML file from the lightsrv program itself
