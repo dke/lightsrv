@@ -5,8 +5,38 @@ Server copied from `nghttp2.git/examples/asio-sv.cc`
 ## Dependencies
 
 * Boost
-* nghttp2 with asio bindings (you'll probably need to build that yourself, or are there packages providing this?)
+* nghttp2 with asio bindings (you'll probably need to build that yourself, or are there packages providing this?) **and our custom patch applied**
 * C library for Broadcom BCM 2835 as used in Raspberry Pi : https://www.airspayce.com/mikem/bcm2835/
+
+### nghttp2
+
+Installed some prereqs like for lowdoh, i.e.
+
+```
+sudo apt install build-essential libldns-dev meson ninja-build pkg-config libboost-all-dev libasio-dev libevent-dev libev-dev libssl-dev zlib1g-dev libxml2-dev libjansson-dev libjemalloc-dev pkg-config
+```
+
+As of time of writing, latest master (some 1.44.0-DEV, 40679cf638541729752470900004c5acfdb247d1) was working. But we still need our custom patch.
+
+
+```
+git clone https://github.com/nghttp2/nghttp2.git nghttp2.upstream.git
+cd nghttp2.upstream.git
+patch -p1 < ../lightsrv/patch-for-lightsrv.patch
+```
+
+Building according to https://nghttp2.org/documentation/package_README.html#building-from-git but we add the `--enable-asio-lib` switch.
+
+```
+git submodule update --init
+autoreconf -i
+automake
+autoconf
+./configure --enable-asio-lib
+make
+sudo make install
+```
+
 
 ### BCM 2835
 
@@ -77,7 +107,7 @@ In your build directory:
 ninja install
 ```
 
-This installs the binary, the selfsigned key / cert, the `index.html` file, and the systemd service file.
+This installs the binary, the config file, the selfsigned key / cert, the `index.html` file, and the systemd service file.
 
 You can invoke with with a `DESTDIR` environment variable set to install it into a staging area for transferring to other hosts.
 
