@@ -11,3 +11,6 @@ WorkingDirectory=/usr/local/etc/lightsrv
 
 [Install]
 WantedBy=multi-user.target
+
+[Service]
+Environment="LD_LIBRARY_PATH=/usr/local/lib"
